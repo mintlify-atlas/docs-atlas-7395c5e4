@@ -1,0 +1,153 @@
+{
+  "projectType": "saas",
+  "projectName": "AdonisJS Starter Kit",
+  "projectDescription": "A robust, monorepo-based template for developing full-stack applications with AdonisJS, featuring authentication, user management, and a modern React frontend.",
+  "theme": "mint",
+  "primaryColor": "#5A45FF",
+  "lightColor": "#867AFF",
+  "darkColor": "#3B2EC4",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Project Structure",
+            "pages": [
+              "structure/overview",
+              "structure/monorepo",
+              "structure/modules"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/authentication",
+              "features/user-management",
+              "features/authorization",
+              "features/api-tokens",
+              "features/social-auth",
+              "features/internationalization",
+              "features/appearance-settings"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "development/database",
+              "development/frontend",
+              "development/ui-components",
+              "development/routes",
+              "development/models"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/docker",
+              "deployment/production",
+              "deployment/environment"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "User Guides",
+            "pages": [
+              "guides/creating-modules",
+              "guides/adding-components",
+              "guides/configuring-social-auth",
+              "guides/email-setup",
+              "guides/database-seeding"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "guides/user-impersonation",
+              "guides/file-attachments",
+              "guides/custom-abilities",
+              "guides/extending-the-kit"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "API",
+            "pages": [
+              "reference/models",
+              "reference/controllers",
+              "reference/middleware",
+              "reference/validators"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "reference/environment-variables",
+              "reference/package-structure",
+              "reference/libraries"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Monorepo setup with TurboRepo and pnpm",
+    "User authentication and authorization with AdonisJS",
+    "Social authentication (Google, GitHub) via @adonisjs/ally",
+    "Password recovery and reset functionality",
+    "User management with roles and permissions",
+    "User impersonation for admin support",
+    "API tokens for personal access",
+    "Internationalization (i18n) with English and Portuguese",
+    "Modern React frontend with Inertia.js integration",
+    "ShadCN UI components with Tailwind CSS",
+    "Theme customization (Light/Dark mode)",
+    "PostgreSQL database with migrations and seeders",
+    "Modular architecture with @adonisjs-community/modules",
+    "File attachment handling with thumbnails",
+    "Docker support with docker-compose",
+    "Mailpit for email testing",
+    "PgAdmin for database management"
+  ],
+  "publicApiSurface": [
+    "POST /login - User sign in",
+    "GET /logout - User sign out",
+    "POST /sign-up - User registration",
+    "POST /forgot-password - Request password reset",
+    "POST /reset-password/:token - Reset password with token",
+    "GET /:provider/redirect - Social auth redirect",
+    "GET /:provider/callback - Social auth callback",
+    "GET /users - List users (authenticated)",
+    "POST /users - Create user (authenticated)",
+    "PUT /users/:id - Update user (authenticated)",
+    "DELETE /users/:id - Delete user (authenticated)",
+    "POST /users/invite - Invite user (authenticated)",
+    "POST /users/impersonate/:id - Impersonate user (admin)",
+    "GET /settings/profile - View profile settings",
+    "PUT /settings/profile - Update profile",
+    "GET /settings/password - View password settings",
+    "PUT /settings/password - Update password",
+    "GET /settings/appearance - View appearance settings",
+    "GET /settings/tokens - List API tokens",
+    "POST /api/tokens - Create API token",
+    "DELETE /settings/tokens/:id - Delete API token",
+    "GET /dashboard - Analytics dashboard"
+  ]
+}
