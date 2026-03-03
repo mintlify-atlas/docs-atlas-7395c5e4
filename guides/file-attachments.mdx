@@ -1,0 +1,359 @@
+---
+title: 'File Attachments'
+description: 'Handle file uploads and attachments using @jrmc/adonis-attachment'
+icon: 'paperclip'
+---
+
+## Overview
+
+The AdonisJS Starter Kit uses [@jrmc/adonis-attachment](https://github.com/batosai/adonis-attachment) for handling file uploads and attachments. This package provides a clean, type-safe way to manage file uploads with support for multiple storage drivers and automatic file variants (like thumbnails).
+
+## Features
+
+- Multiple storage drivers (local, S3, etc.)
+- Automatic file variants and image processing
+- Type-safe attachment handling
+- Pre-computed URLs for better performance
+- Seamless integration with Lucid models
+
+## Configuration
+
+The attachment configuration is located in `config/attachment.ts`:
+
+```typescript config/attachment.ts
+import { defineConfig } from '@jrmc/adonis-attachment'
+import { InferConverters } from '@jrmc/adonis-attachment/types/config'
+
+const attachmentConfig = defineConfig({
+  converters: {
+    thumbnail: {
+      options: {
+        resize: 300,
+        format: 'webp',
+      },
+    },
+  },
+})
+
+export default attachmentConfig
+
+declare module '@jrmc/adonis-attachment' {
+  interface AttachmentVariants extends InferConverters<typeof attachmentConfig> {}
+}
+```
+
+<Tip>
+The configuration defines image variants that are automatically generated. In this example, a thumbnail variant is created by resizing images to 300px and converting to WebP format.
+</Tip>
+
+## Model Integration
+
+### Adding Attachments to Models
+
+Here's how the User model implements avatar attachments:
+
+```typescript app/users/models/user.ts
+import { attachment, attachmentManager } from '@jrmc/adonis-attachment'
+import type { Attachment } from '@jrmc/adonis-attachment/types/attachment'
+import BaseModel from '#common/models/base_model'
+
+export default class User extends BaseModel {
+  // ... other columns
+
+  @attachment({ preComputeUrl: false, variants: ['thumbnail'] })
+  declare avatar: Attachment
+
+  @column()
+  declare avatarUrl: string | null
+
+  static async preComputeUrls(models: User | User[]) {
+    if (Array.isArray(models)) {
+      await Promise.all(models.map((model) => this.preComputeUrls(model)))
+      return
+    }
+
+    if (!models.avatar) {
+      return
+    }
+
+    const thumbnail = models.avatar.getVariant('thumbnail')
+
+    if (thumbnail) {
+      await attachmentManager.computeUrl(thumbnail)
+    }
+  }
+}
+```
+
+<Note>
+The `@attachment` decorator options:
+- `preComputeUrl: false` - URLs are computed on-demand instead of automatically
+- `variants: ['thumbnail']` - Specifies which variants to generate (must match config)
+</Note>
+
+### Pre-computing URLs
+
+The `preComputeUrls` method optimizes performance by generating signed URLs before rendering:
+
+```typescript
+// Pre-compute URLs before sending to the frontend
+await User.preComputeUrls(users)
+
+// Or for a single user
+await User.preComputeUrls(auth.user!)
+```
+
+## Controller Implementation
+
+Here's how file uploads are handled in the ProfileController:
+
+```typescript app/users/controllers/profile_controller.ts
+import type { HttpContext } from '@adonisjs/core/http'
+import { attachmentManager } from '@jrmc/adonis-attachment'
+import User from '#users/models/user'
+import { updateProfileValidator } from '#users/validators'
+
+export default class ProfileController {
+  public async handle({ auth, request, response }: HttpContext) {
+    const { avatar, ...payload } = await request.validateUsing(updateProfileValidator)
+
+    const user = await User.findOrFail(auth.user!.id)
+
+    if (avatar) {
+      user.avatar = await attachmentManager.createFromFile(avatar)
+    }
+
+    user.merge({
+      ...payload,
+    })
+
+    await user.save()
+
+    return response.redirect().toRoute('profile.show')
+  }
+}
+```
+
+<Steps>
+  <Step title="Extract file from request">
+    The validator extracts the avatar file from the request payload
+  </Step>
+  <Step title="Create attachment">
+    Use `attachmentManager.createFromFile()` to create an attachment from the uploaded file
+  </Step>
+  <Step title="Assign to model">
+    Assign the attachment to the model property
+  </Step>
+  <Step title="Save model">
+    Save the model - the attachment is automatically persisted
+  </Step>
+</Steps>
+
+## Validation
+
+Validate file uploads using VineJS validators:
+
+```typescript app/users/validators.ts
+import vine from '@vinejs/vine'
+
+export const updateProfileValidator = vine.compile(
+  vine.object({
+    fullName: vine.string().trim().minLength(3).maxLength(255),
+    avatar: vine
+      .file({
+        extnames: ['png', 'jpg', 'jpeg', 'gif'],
+        size: 1 * 1024 * 1024, // 1MB
+      })
+      .nullable(),
+  })
+)
+```
+
+<Warning>
+Always validate file uploads to prevent security issues:
+- Restrict allowed file extensions
+- Set maximum file size limits
+- Consider scanning for malware in production
+</Warning>
+
+## Frontend Implementation
+
+### File Upload Form
+
+```tsx
+import { useForm } from '@inertiajs/react'
+
+function ProfileForm() {
+  const { data, setData, post, processing } = useForm({
+    fullName: '',
+    avatar: null,
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    post('/settings/profile')
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        type="text"
+        value={data.fullName}
+        onChange={(e) => setData('fullName', e.target.value)}
+      />
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => setData('avatar', e.target.files[0])}
+      />
+      <button type="submit" disabled={processing}>
+        Update Profile
+      </button>
+    </form>
+  )
+}
+```
+
+### Displaying Attachments
+
+```tsx
+function UserAvatar({ user }) {
+  // Access the thumbnail variant
+  const avatarUrl = user.avatar?.variants?.thumbnail?.url
+
+  return avatarUrl ? (
+    <img src={avatarUrl} alt={user.fullName} />
+  ) : (
+    <div>No avatar</div>
+  )
+}
+```
+
+## Storage Drivers
+
+### Local Storage (Default)
+
+By default, files are stored locally. Configure the storage path in your environment:
+
+```env
+DRIVE_DISK=local
+```
+
+### S3 Storage
+
+To use S3 for file storage:
+
+1. Install the S3 driver:
+
+```bash
+pnpm add @adonisjs/drive-s3
+```
+
+2. Configure S3 credentials in `.env`:
+
+```env
+DRIVE_DISK=s3
+S3_KEY=your-key
+S3_SECRET=your-secret
+S3_BUCKET=your-bucket
+S3_REGION=us-east-1
+```
+
+## Advanced Usage
+
+### Multiple Variants
+
+Define multiple image variants for different use cases:
+
+```typescript
+const attachmentConfig = defineConfig({
+  converters: {
+    thumbnail: {
+      options: {
+        resize: 300,
+        format: 'webp',
+      },
+    },
+    medium: {
+      options: {
+        resize: 800,
+        format: 'webp',
+      },
+    },
+    large: {
+      options: {
+        resize: 1920,
+        format: 'webp',
+      },
+    },
+  },
+})
+```
+
+### Deleting Attachments
+
+```typescript
+// Delete the attachment and its variants
+if (user.avatar) {
+  await attachmentManager.delete(user.avatar)
+  user.avatar = null
+  await user.save()
+}
+```
+
+### Custom File Names
+
+```typescript
+const attachment = await attachmentManager.createFromFile(file, {
+  name: 'custom-name',
+})
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always Pre-compute URLs">
+    Pre-compute URLs before sending data to the frontend to avoid N+1 query problems:
+    ```typescript
+    const users = await User.query().paginate(1, 10)
+    await User.preComputeUrls(users)
+    ```
+  </Accordion>
+  
+  <Accordion title="Use Appropriate Variants">
+    Create variants for different use cases (thumbnails for lists, medium for previews, large for detail views) to optimize bandwidth and loading times.
+  </Accordion>
+  
+  <Accordion title="Handle Upload Errors">
+    Always handle upload errors gracefully and provide user feedback:
+    ```typescript
+    try {
+      user.avatar = await attachmentManager.createFromFile(avatar)
+      await user.save()
+    } catch (error) {
+      return response.badRequest({ message: 'Failed to upload file' })
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Clean Up Old Files">
+    When replacing attachments, delete old files to prevent storage bloat:
+    ```typescript
+    if (user.avatar) {
+      await attachmentManager.delete(user.avatar)
+    }
+    user.avatar = await attachmentManager.createFromFile(newAvatar)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Models" icon="database" href="/development/models">
+    Learn more about model configuration and relationships
+  </Card>
+  <Card title="Validation" icon="check" href="/reference/validators">
+    Explore validation patterns and best practices
+  </Card>
+</CardGroup>

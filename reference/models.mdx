@@ -1,0 +1,279 @@
+---
+title: Models
+description: Complete reference for all Lucid ORM models in the AdonisJS Starter Kit
+---
+
+This reference documents all database models used in the application, including their properties, relationships, and methods.
+
+## User Model
+
+The User model represents authenticated users in the system. It extends BaseModel and includes authentication capabilities through the AuthFinder mixin.
+
+**Location:** `apps/web/app/users/models/user.ts`
+
+### Properties
+
+<ParamField path="id" type="number" required>
+  Primary key identifier for the user
+</ParamField>
+
+<ParamField path="roleId" type="number" required>
+  Foreign key reference to the user's role
+</ParamField>
+
+<ParamField path="fullName" type="string | null">
+  User's full name (optional)
+</ParamField>
+
+<ParamField path="email" type="string" required>
+  User's email address (unique, used for authentication)
+</ParamField>
+
+<ParamField path="password" type="string | null">
+  Hashed password using scrypt algorithm (not serialized in API responses)
+</ParamField>
+
+<ParamField path="avatar" type="Attachment">
+  User avatar image with thumbnail variant support
+</ParamField>
+
+<ParamField path="avatarUrl" type="string | null">
+  Pre-computed URL for the avatar image
+</ParamField>
+
+<ParamField path="createdAt" type="DateTime" required>
+  Timestamp when the user was created (auto-generated)
+</ParamField>
+
+<ParamField path="updatedAt" type="DateTime">
+  Timestamp when the user was last updated (auto-updated)
+</ParamField>
+
+### Relationships
+
+<Accordion title="role - BelongsTo">
+  ```typescript
+  @belongsTo(() => Role)
+  declare role: BelongsTo<typeof Role>
+  ```
+  
+  Each user belongs to one role that defines their permissions and access level.
+</Accordion>
+
+<Accordion title="resetPasswordTokens - HasMany">
+  ```typescript
+  @hasMany(() => ResetPasswordToken)
+  declare resetPasswordTokens: HasMany<typeof ResetPasswordToken>
+  ```
+  
+  Collection of password reset tokens associated with the user.
+</Accordion>
+
+### Computed Properties
+
+<ParamField path="isAdmin" type="boolean">
+  Returns true if the user has admin role privileges
+  
+  ```typescript
+  @computed()
+  get isAdmin() {
+    return this.roleId === Roles.ADMIN
+  }
+  ```
+</ParamField>
+
+### Methods
+
+<Accordion title="preComputeUrls()">
+  Static method to pre-compute avatar URLs for one or multiple users.
+  
+  ```typescript
+  static async preComputeUrls(models: User | User[])
+  ```
+  
+  **Parameters:**
+  - `models` - Single user or array of users to process
+  
+  **Description:**
+  Generates thumbnail URLs for user avatars using the attachment manager.
+</Accordion>
+
+<Accordion title="accessTokens">
+  Static property for managing API access tokens.
+  
+  ```typescript
+  static accessTokens = DbAccessTokensProvider.forModel(User)
+  ```
+  
+  **Methods:**
+  - `create(user, abilities?, options?)` - Create new access token
+  - `all(user)` - Get all tokens for a user
+  - `delete(user, tokenId)` - Delete a specific token
+</Accordion>
+
+### Authentication
+
+The User model uses the `withAuthFinder` mixin with the following configuration:
+
+```typescript
+const AuthFinder = withAuthFinder(() => hash.use('scrypt'), {
+  uids: ['email'],
+  passwordColumnName: 'password',
+})
+```
+
+- **Hash Driver:** scrypt
+- **Unique Identifier:** email
+- **Password Column:** password
+
+---
+
+## Role Model
+
+The Role model defines user roles and their associated permissions.
+
+**Location:** `apps/web/app/users/models/role.ts`
+
+### Properties
+
+<ParamField path="id" type="number" required>
+  Primary key identifier for the role
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Role name (e.g., "admin", "user")
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  Human-readable description of the role
+</ParamField>
+
+<ParamField path="createdAt" type="DateTime" required>
+  Timestamp when the role was created
+</ParamField>
+
+<ParamField path="updatedAt" type="DateTime" required>
+  Timestamp when the role was last updated
+</ParamField>
+
+### Relationships
+
+<Accordion title="users - HasMany">
+  ```typescript
+  @hasMany(() => User)
+  declare users: HasMany<typeof User>
+  ```
+  
+  Collection of users assigned to this role.
+</Accordion>
+
+---
+
+## ResetPasswordToken Model
+
+The ResetPasswordToken model stores temporary tokens for password reset flows.
+
+**Location:** `apps/web/app/users/models/reset_password_token.ts`
+
+### Properties
+
+<ParamField path="id" type="number" required>
+  Primary key identifier for the token
+</ParamField>
+
+<ParamField path="userId" type="number" required>
+  Foreign key reference to the user
+</ParamField>
+
+<ParamField path="token" type="string" required>
+  Unique token string for password reset
+</ParamField>
+
+<ParamField path="createdAt" type="DateTime" required>
+  Timestamp when the token was created
+</ParamField>
+
+<ParamField path="expiresAt" type="DateTime" required>
+  Timestamp when the token expires
+</ParamField>
+
+### Relationships
+
+<Accordion title="user - BelongsTo">
+  ```typescript
+  @belongsTo(() => User)
+  declare user: BelongsTo<typeof User>
+  ```
+  
+  The user who requested the password reset.
+</Accordion>
+
+---
+
+## BaseModel
+
+Abstract base model that provides common timestamp fields for all models.
+
+**Location:** `apps/web/app/common/models/base_model.ts`
+
+### Properties
+
+<ParamField path="createdAt" type="DateTime" required>
+  Timestamp when the record was created (auto-generated)
+</ParamField>
+
+<ParamField path="updatedAt" type="DateTime | null">
+  Timestamp when the record was last updated (auto-updated)
+</ParamField>
+
+### Usage
+
+Extend BaseModel to automatically include timestamp tracking:
+
+```typescript
+import BaseModel from '#common/models/base_model'
+
+export default class MyModel extends BaseModel {
+  // Your model properties
+}
+```
+
+---
+
+## Type Definitions
+
+### MailBasicTranslation
+
+Interface for email translation content.
+
+**Location:** `apps/web/app/common/models/mail_basic_translation.ts`
+
+```typescript
+export interface MailBasicTranslation {
+  subject: string
+  title: string
+  subtitle: string
+  actionBtn: string
+  defaultMessage: string
+}
+```
+
+<ParamField path="subject" type="string" required>
+  Email subject line
+</ParamField>
+
+<ParamField path="title" type="string" required>
+  Main heading in the email
+</ParamField>
+
+<ParamField path="subtitle" type="string" required>
+  Secondary heading or description
+</ParamField>
+
+<ParamField path="actionBtn" type="string" required>
+  Text for the call-to-action button
+</ParamField>
+
+<ParamField path="defaultMessage" type="string" required>
+  Fallback message content
+</ParamField>

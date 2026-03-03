@@ -1,0 +1,548 @@
+---
+title: Validators
+description: Complete reference for all VineJS validation schemas in the AdonisJS Starter Kit
+---
+
+This reference documents all validation schemas used for request validation in the application.
+
+## Authentication Validators
+
+**Location:** `apps/web/app/auth/validators.ts`
+
+All authentication validators use VineJS for schema definition and validation.
+
+### signUpValidator
+
+Validates user registration data.
+
+```typescript
+export const signUpValidator = vine.compile(
+  vine.object({
+    fullName: vine.string().trim().minLength(3).maxLength(255),
+    email: vine.string().email().toLowerCase().trim().unique({ table: 'users', column: 'email' }),
+    password: vine.string().minLength(1).confirmed({ confirmationField: 'passwordConfirmation' }),
+  })
+)
+```
+
+<ParamField path="fullName" type="string" required>
+  User's full name
+  
+  **Validation:**
+  - Trimmed whitespace
+  - Minimum length: 3 characters
+  - Maximum length: 255 characters
+</ParamField>
+
+<ParamField path="email" type="string" required>
+  User's email address
+  
+  **Validation:**
+  - Valid email format
+  - Converted to lowercase
+  - Trimmed whitespace
+  - Must be unique in `users` table
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  User's password
+  
+  **Validation:**
+  - Minimum length: 1 character
+  - Requires confirmation field
+</ParamField>
+
+<ParamField path="passwordConfirmation" type="string" required>
+  Password confirmation (must match password)
+</ParamField>
+
+---
+
+### signInValidator
+
+Validates user login credentials.
+
+```typescript
+export const signInValidator = vine.compile(
+  vine.object({
+    email: vine.string().email().toLowerCase().trim(),
+    password: vine.string().minLength(1),
+  })
+)
+```
+
+<ParamField path="email" type="string" required>
+  User's email address
+  
+  **Validation:**
+  - Valid email format
+  - Converted to lowercase
+  - Trimmed whitespace
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  User's password
+  
+  **Validation:**
+  - Minimum length: 1 character
+</ParamField>
+
+---
+
+### forgotPasswordValidator
+
+Validates forgot password request.
+
+```typescript
+export const forgotPasswordValidator = vine.compile(
+  vine.object({
+    email: vine.string().email().trim().normalizeEmail({ gmail_remove_dots: false }),
+  })
+)
+```
+
+<ParamField path="email" type="string" required>
+  Email address to send reset link
+  
+  **Validation:**
+  - Valid email format
+  - Trimmed whitespace
+  - Normalized email format
+  - Gmail dots are preserved
+</ParamField>
+
+---
+
+### resetPasswordValidator
+
+Validates new password during reset.
+
+```typescript
+export const resetPasswordValidator = vine.compile(
+  vine.object({
+    password: vine.string().minLength(1).confirmed({ confirmationField: 'passwordConfirmation' }),
+  })
+)
+```
+
+<ParamField path="password" type="string" required>
+  New password
+  
+  **Validation:**
+  - Minimum length: 1 character
+  - Requires confirmation
+</ParamField>
+
+<ParamField path="passwordConfirmation" type="string" required>
+  Password confirmation (must match password)
+</ParamField>
+
+---
+
+## User Management Validators
+
+**Location:** `apps/web/app/users/validators.ts`
+
+### createUserValidator
+
+Validates data for creating a new user (admin function).
+
+```typescript
+export const createUserValidator = vine.compile(
+  vine.object({
+    fullName: vine.string().trim().minLength(3).maxLength(255),
+    email: vine.string().email().toLowerCase().trim().unique({ table: 'users', column: 'email' }),
+    roleId: vine.number().exists({ table: 'roles', column: 'id' }),
+    password: vine
+      .string()
+      .minLength(1)
+      .maxLength(255)
+      .confirmed({ confirmationField: 'passwordConfirmation' })
+      .optional(),
+  })
+)
+```
+
+<ParamField path="fullName" type="string" required>
+  User's full name (3-255 characters, trimmed)
+</ParamField>
+
+<ParamField path="email" type="string" required>
+  Unique email address (lowercase, trimmed)
+</ParamField>
+
+<ParamField path="roleId" type="number" required>
+  Role ID (must exist in `roles` table)
+</ParamField>
+
+<ParamField path="password" type="string">
+  Optional password (auto-generated if not provided)
+  
+  **Validation:**
+  - 1-255 characters
+  - Requires confirmation if provided
+</ParamField>
+
+---
+
+### editUserValidator
+
+Validates data for updating an existing user.
+
+```typescript
+export const editUserValidator = vine.withMetaData<{ userId: number }>().compile(
+  vine.object({
+    fullName: vine.string().trim().minLength(3).maxLength(255),
+    email: vine
+      .string()
+      .email()
+      .toLowerCase()
+      .trim()
+      .unique(async (_, value, field) => {
+        const row = await User.query()
+          .where('email', value)
+          .whereNot('id', field.meta.userId)
+          .first()
+        return row ? false : true
+      }),
+    roleId: vine.number().exists({ table: 'roles', column: 'id' }),
+    password: vine
+      .string()
+      .minLength(1)
+      .maxLength(255)
+      .confirmed({ confirmationField: 'passwordConfirmation' })
+      .optional(),
+  })
+)
+```
+
+<Info>
+  This validator uses metadata to pass the current user ID for email uniqueness validation.
+  
+  **Usage:**
+  ```typescript
+  const payload = await request.validateUsing(editUserValidator, {
+    meta: { userId: params.id }
+  })
+  ```
+</Info>
+
+<ParamField path="fullName" type="string" required>
+  User's full name (3-255 characters)
+</ParamField>
+
+<ParamField path="email" type="string" required>
+  Email address (must be unique except for current user)
+</ParamField>
+
+<ParamField path="roleId" type="number" required>
+  Role ID (must exist in database)
+</ParamField>
+
+<ParamField path="password" type="string">
+  Optional new password (keeps existing if not provided)
+</ParamField>
+
+---
+
+### updateProfileValidator
+
+Validates profile updates for authenticated users.
+
+```typescript
+export const updateProfileValidator = vine.compile(
+  vine.object({
+    fullName: vine.string().trim().minLength(3).maxLength(255),
+    avatar: vine
+      .file({
+        extnames: ['png', 'jpg', 'jpeg', 'gif'],
+        size: 1 * 1024 * 1014,
+      })
+      .nullable(),
+  })
+)
+```
+
+<ParamField path="fullName" type="string" required>
+  User's full name (3-255 characters)
+</ParamField>
+
+<ParamField path="avatar" type="File">
+  Profile picture upload
+  
+  **Validation:**
+  - Allowed formats: PNG, JPG, JPEG, GIF
+  - Maximum size: ~1MB (1,038,336 bytes)
+  - Nullable (can be empty)
+</ParamField>
+
+---
+
+### updatePasswordValidator
+
+Validates password change requests.
+
+```typescript
+export const updatePasswordValidator = vine.compile(
+  vine.object({
+    password: vine
+      .string()
+      .minLength(1)
+      .maxLength(255)
+      .confirmed({ confirmationField: 'passwordConfirmation' }),
+  })
+)
+```
+
+<ParamField path="password" type="string" required>
+  New password (1-255 characters, requires confirmation)
+</ParamField>
+
+---
+
+### listUserValidator
+
+Validates user listing/search parameters.
+
+```typescript
+export const listUserValidator = vine.compile(
+  vine.object({
+    ...baseSearchValidator.getProperties(),
+    roleIds: vine.array(vine.number().exists({ table: 'roles', column: 'id' })).optional(),
+  })
+)
+```
+
+<ParamField path="page" type="number">
+  Page number (positive integer, no decimals)
+</ParamField>
+
+<ParamField path="perPage" type="number">
+  Results per page (positive integer, no decimals)
+</ParamField>
+
+<ParamField path="q" type="string">
+  Search query (1-255 characters)
+</ParamField>
+
+<ParamField path="roleIds" type="number[]">
+  Array of role IDs to filter by (each must exist in `roles` table)
+</ParamField>
+
+---
+
+### createTokenValidator
+
+Validates API token creation.
+
+```typescript
+export const createTokenValidator = vine.compile(
+  vine.object({
+    name: vine.string().trim().minLength(3).maxLength(255).optional(),
+  })
+)
+```
+
+<ParamField path="name" type="string">
+  Optional token name (3-255 characters, defaults to "Secret Token")
+</ParamField>
+
+---
+
+### inviteUserValidator
+
+Validates user invitation data.
+
+```typescript
+export const inviteUserValidator = vine.compile(
+  vine.object({
+    email: vine.string().email().toLowerCase().trim().unique({ table: 'users', column: 'email' }),
+    description: vine.string().trim().optional(),
+    roleId: vine.number().exists({ table: 'roles', column: 'id' }),
+  })
+)
+```
+
+<ParamField path="email" type="string" required>
+  Invitee's email address (must be unique)
+</ParamField>
+
+<ParamField path="description" type="string">
+  Optional invitation message
+</ParamField>
+
+<ParamField path="roleId" type="number" required>
+  Role to assign to the invited user
+</ParamField>
+
+---
+
+## Common Validators
+
+### baseSearchValidator
+
+Base schema for search and pagination parameters.
+
+**Location:** `apps/web/app/common/validators/search.ts`
+
+```typescript
+export const baseSearchValidator = vine.object({
+  page: vine.number().withoutDecimals().positive().optional(),
+  perPage: vine.number().withoutDecimals().positive().optional(),
+  q: vine.string().minLength(1).maxLength(255).optional(),
+})
+```
+
+<ParamField path="page" type="number">
+  Current page number
+  
+  **Validation:**
+  - Must be a positive integer
+  - No decimal values
+  - Optional (defaults to 1)
+</ParamField>
+
+<ParamField path="perPage" type="number">
+  Number of results per page
+  
+  **Validation:**
+  - Must be a positive integer
+  - No decimal values
+  - Optional (defaults to 10)
+</ParamField>
+
+<ParamField path="q" type="string">
+  Search query string
+  
+  **Validation:**
+  - Minimum length: 1 character
+  - Maximum length: 255 characters
+  - Optional
+</ParamField>
+
+---
+
+## Validation Usage
+
+<Tabs>
+  <Tab title="Basic Usage">
+    ```typescript
+    import { signInValidator } from '#auth/validators'
+    
+    export default class SignInController {
+      async handle({ request }: HttpContext) {
+        const { email, password } = await request.validateUsing(signInValidator)
+        // Data is now validated and type-safe
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="With Metadata">
+    ```typescript
+    import { editUserValidator } from '#users/validators'
+    
+    export default class UsersController {
+      async update({ params, request }: HttpContext) {
+        const payload = await request.validateUsing(editUserValidator, {
+          meta: { userId: params.id }
+        })
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Error Handling">
+    VineJS automatically returns validation errors in a structured format:
+    
+    ```json
+    {
+      "errors": [
+        {
+          "field": "email",
+          "message": "The email field must be a valid email address",
+          "rule": "email"
+        }
+      ]
+    }
+    ```
+    
+    Errors are automatically translated using i18n when configured.
+  </Tab>
+  
+  <Tab title="Custom Rules">
+    Example of custom async validation:
+    
+    ```typescript
+    vine.string().unique(async (_, value, field) => {
+      const exists = await Model.query()
+        .where('column', value)
+        .first()
+      return !exists // true if valid, false if invalid
+    })
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Validation Rules Reference
+
+<Accordion title="String Rules">
+  - `trim()` - Remove leading/trailing whitespace
+  - `toLowerCase()` / `toUpperCase()` - Convert case
+  - `minLength(n)` - Minimum character count
+  - `maxLength(n)` - Maximum character count
+  - `email()` - Valid email format
+  - `normalizeEmail()` - Normalize email addresses
+  - `confirmed({ confirmationField })` - Match another field
+</Accordion>
+
+<Accordion title="Number Rules">
+  - `withoutDecimals()` - Integer only
+  - `positive()` - Greater than zero
+  - `min(n)` / `max(n)` - Range validation
+  - `exists({ table, column })` - Must exist in database
+</Accordion>
+
+<Accordion title="File Rules">
+  - `extnames([])` - Allowed file extensions
+  - `size` - Maximum file size in bytes
+  - Example: `1 * 1024 * 1024` = 1MB
+</Accordion>
+
+<Accordion title="Database Rules">
+  - `unique({ table, column })` - Must be unique in table
+  - `exists({ table, column })` - Must exist in table
+  - Custom async validation with database queries
+</Accordion>
+
+<Accordion title="Modifiers">
+  - `optional()` - Field is not required
+  - `nullable()` - Accepts null values
+  - `withMetaData<T>()` - Add metadata for validation context
+</Accordion>
+
+---
+
+## i18n Configuration
+
+Validation messages are automatically translated:
+
+```typescript
+import i18nManager from '@adonisjs/i18n/services/main'
+const i18n = i18nManager.locale('fr')
+vine.messagesProvider = i18n.createMessagesProvider()
+```
+
+Custom error messages can be defined in your i18n files:
+
+```json
+{
+  "validation": {
+    "email": "The {{ field }} must be a valid email address",
+    "minLength": "The {{ field }} must be at least {{ options.minLength }} characters",
+    "unique": "The {{ field }} is already taken"
+  }
+}
+```

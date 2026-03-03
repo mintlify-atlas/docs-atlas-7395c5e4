@@ -1,0 +1,414 @@
+---
+title: Email Configuration
+description: Configure email sending with SMTP, Resend, or Mailpit for development
+---
+
+The AdonisJS Starter Kit uses [@adonisjs/mail](https://docs.adonisjs.com/guides/mail) for sending emails. It supports multiple email providers and includes Mailpit for local development testing.
+
+## Email Providers
+
+The starter kit is pre-configured with two email transports:
+
+1. **SMTP** - Universal email sending (Gmail, SendGrid, etc.)
+2. **Resend** - Modern email API for developers
+3. **Mailpit** - Local email testing (development only)
+
+## Development Setup with Mailpit
+
+Mailpit is included in the Docker Compose setup for testing emails during development.
+
+<Steps>
+  <Step title="Start the Docker services">
+    ```bash
+    docker compose up -d
+    ```
+
+    This starts PostgreSQL, PgAdmin, and Mailpit.
+  </Step>
+
+  <Step title="Configure SMTP for Mailpit">
+    Your `.env` file should have these settings:
+
+    ```bash .env
+    SMTP_HOST=localhost
+    SMTP_PORT=1025
+    SMTP_USERNAME=user@host.com
+    SMTP_PASSWORD='XXX'
+    SMTP_SECURE=0
+    SMTP_REJECTUNAUTHORIZED=false
+    
+    EMAIL_FROM=admin@repo.com
+    ```
+
+    <Info>
+      Mailpit accepts any credentials, so the username and password don't need to be real.
+    </Info>
+  </Step>
+
+  <Step title="Access the Mailpit web interface">
+    Open your browser and navigate to:
+    
+    ```
+    http://localhost:8025
+    ```
+
+    All emails sent by your application will appear here, allowing you to test email templates and functionality without actually sending emails.
+  </Step>
+
+  <Step title="Test email sending">
+    Trigger a password reset or any other email function in your app, then check the Mailpit interface to see the email.
+  </Step>
+</Steps>
+
+## Production Setup with SMTP
+
+<Steps>
+  <Step title="Choose an SMTP provider">
+    Popular SMTP providers include:
+    - **Gmail** - Free for low volume
+    - **SendGrid** - Up to 100 emails/day free
+    - **Mailgun** - Flexible pricing
+    - **Amazon SES** - Cost-effective at scale
+    - **Postmark** - Transactional email specialist
+  </Step>
+
+  <Step title="Get SMTP credentials">
+    Each provider will give you:
+    - SMTP host (e.g., `smtp.gmail.com`)
+    - SMTP port (usually `587` or `465`)
+    - Username (often your email address)
+    - Password or API key
+  </Step>
+
+  <Step title="Configure environment variables">
+    Update your production `.env` file:
+
+    ```bash .env
+    SMTP_HOST=smtp.gmail.com
+    SMTP_PORT=587
+    SMTP_USERNAME=your-email@gmail.com
+    SMTP_PASSWORD=your-app-password
+    SMTP_SECURE=1
+    
+    EMAIL_FROM=noreply@yourdomain.com
+    ```
+
+    <Warning>
+      For Gmail, you need to use an [App Password](https://support.google.com/accounts/answer/185833), not your regular password.
+    </Warning>
+  </Step>
+</Steps>
+
+## Production Setup with Resend
+
+[Resend](https://resend.com/) is a modern email API designed for developers.
+
+<Steps>
+  <Step title="Create a Resend account">
+    1. Go to [resend.com](https://resend.com/)
+    2. Sign up for a free account
+    3. Verify your domain (or use the test domain)
+  </Step>
+
+  <Step title="Get your API key">
+    1. Go to **API Keys** in the Resend dashboard
+    2. Create a new API key
+    3. Copy the key (it won't be shown again)
+  </Step>
+
+  <Step title="Configure environment variables">
+    ```bash .env
+    RESEND_API_KEY=re_your_api_key_here
+    EMAIL_FROM=onboarding@yourdomain.com
+    ```
+  </Step>
+
+  <Step title="Switch the default mailer">
+    Update `config/mail.ts` to use Resend as the default:
+
+    ```typescript config/mail.ts
+    const mailConfig = defineConfig({
+      default: 'resend', // Changed from 'smtp'
+      
+      mailers: {
+        // ... existing configuration
+      },
+    })
+    ```
+  </Step>
+</Steps>
+
+## Mail Configuration
+
+The mail configuration is located in `config/mail.ts`:
+
+```typescript config/mail.ts
+import env from '#start/env'
+import { defineConfig, transports } from '@adonisjs/mail'
+
+const mailConfig = defineConfig({
+  default: 'smtp',
+
+  mailers: {
+    smtp: transports.smtp({
+      host: env.get('SMTP_HOST'),
+      port: env.get('SMTP_PORT'),
+      secure: env.get('SMTP_SECURE'),
+
+      auth: {
+        type: 'login',
+        user: env.get('SMTP_USERNAME'),
+        pass: env.get('SMTP_PASSWORD'),
+      },
+
+      tls: {
+        rejectUnauthorized: env.get('SMTP_SECURE'),
+      },
+
+      ignoreTLS: false,
+      requireTLS: false,
+
+      pool: false,
+      maxConnections: 5,
+      maxMessages: 100,
+    }),
+
+    resend: transports.resend({
+      key: env.get('RESEND_API_KEY'),
+      baseUrl: 'https://api.resend.com',
+    }),
+  },
+})
+
+export default mailConfig
+```
+
+## Creating Email Templates
+
+The starter kit includes an example email template for password reset:
+
+```typescript app/auth/mails/reset_password_notification.ts
+import { BaseMail } from '@adonisjs/mail'
+import User from '#users/models/user'
+
+export default class ResetPasswordNotification extends BaseMail {
+  subject = 'Reset Your Password'
+
+  constructor(
+    private user: User,
+    private token: string
+  ) {
+    super()
+  }
+
+  prepare() {
+    this.message.to(this.user.email)
+    this.message.htmlView('emails/reset_password', {
+      user: this.user,
+      resetUrl: `${process.env.VITE_API_URL}/reset-password/${this.token}`,
+    })
+  }
+}
+```
+
+<Steps>
+  <Step title="Create a new mail class">
+    ```bash
+    node ace make:mail welcome_email -m=users
+    ```
+
+    This creates a mail class in the specified module.
+  </Step>
+
+  <Step title="Define the email content">
+    ```typescript app/users/mails/welcome_email.ts
+    import { BaseMail } from '@adonisjs/mail'
+    import User from '#users/models/user'
+
+    export default class WelcomeEmail extends BaseMail {
+      subject = 'Welcome to Our Platform'
+
+      constructor(private user: User) {
+        super()
+      }
+
+      prepare() {
+        this.message.to(this.user.email)
+        this.message.htmlView('emails/welcome', {
+          name: this.user.fullName,
+        })
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Create the email template">
+    Create a template file in `resources/views/emails/welcome.edge`:
+
+    ```html
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Welcome</title>
+      </head>
+      <body>
+        <h1>Welcome, {{ name }}!</h1>
+        <p>Thank you for joining our platform.</p>
+      </body>
+    </html>
+    ```
+  </Step>
+
+  <Step title="Send the email">
+    ```typescript
+    import mail from '@adonisjs/mail/services/main'
+    import WelcomeEmail from '#users/mails/welcome_email'
+    import User from '#users/models/user'
+
+    const user = await User.find(1)
+    await mail.send(new WelcomeEmail(user))
+    ```
+  </Step>
+</Steps>
+
+## Sending Emails
+
+There are several ways to send emails:
+
+### Using Mail Classes
+
+```typescript
+import mail from '@adonisjs/mail/services/main'
+import WelcomeEmail from '#users/mails/welcome_email'
+
+await mail.send(new WelcomeEmail(user))
+```
+
+### Using the Fluent API
+
+```typescript
+import mail from '@adonisjs/mail/services/main'
+
+await mail.send((message) => {
+  message
+    .to(user.email)
+    .from('noreply@yourdomain.com')
+    .subject('Welcome!')
+    .htmlView('emails/welcome', { name: user.fullName })
+})
+```
+
+### Queuing Emails
+
+For better performance, send emails in the background:
+
+```typescript
+import mail from '@adonisjs/mail/services/main'
+import WelcomeEmail from '#users/mails/welcome_email'
+
+// Send later (requires a queue setup)
+await mail.sendLater(new WelcomeEmail(user))
+```
+
+## Testing Emails
+
+### Using Mailpit (Recommended)
+
+1. Start Mailpit with Docker Compose
+2. Send emails from your app
+3. View them at `http://localhost:8025`
+
+### Using the Mail Fake
+
+```typescript
+import mail from '@adonisjs/mail/services/main'
+import { test } from '@japa/runner'
+
+test('sends welcome email', async ({ assert }) => {
+  const mailer = mail.fake()
+
+  // Your code that sends email
+  await sendWelcomeEmail(user)
+
+  // Assert email was sent
+  assert.isTrue(
+    mailer.exists((mail) => {
+      return mail.subject === 'Welcome!'
+    })
+  )
+
+  mail.restore()
+})
+```
+
+## Environment Variables Reference
+
+```bash .env.example
+# Email sender address
+EMAIL_FROM=admin@repo.com
+
+# SMTP Configuration
+SMTP_HOST=localhost
+SMTP_PORT=1025
+SMTP_USERNAME=user@host.com
+SMTP_PASSWORD='XXX'
+SMTP_SECURE=0
+SMTP_REJECTUNAUTHORIZED=false
+
+# Resend Configuration (alternative to SMTP)
+RESEND_API_KEY=<your-key>
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Emails not sending in development">
+    1. Check that Mailpit is running: `docker ps`
+    2. Verify SMTP settings match Mailpit configuration
+    3. Check Mailpit logs: `docker logs mailpit`
+  </Accordion>
+
+  <Accordion title="Gmail authentication failed">
+    Gmail requires an App Password, not your regular password:
+    1. Enable 2-factor authentication on your Google account
+    2. Generate an App Password at [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+    3. Use the generated password in your `.env` file
+  </Accordion>
+
+  <Accordion title="Emails going to spam">
+    To improve deliverability:
+    - Set up SPF, DKIM, and DMARC records for your domain
+    - Use a verified sender address
+    - Avoid spam trigger words in subject lines
+    - Include an unsubscribe link
+    - Use a reputable email service provider
+  </Accordion>
+
+  <Accordion title="Connection timeout">
+    Check:
+    - SMTP host and port are correct
+    - Firewall isn't blocking SMTP ports (587, 465, 25)
+    - Your hosting provider allows outbound SMTP connections
+  </Accordion>
+</AccordionGroup>
+
+## Resources
+
+<CardGroup cols={2}>
+  <Card title="AdonisJS Mail Docs" icon="book" href="https://docs.adonisjs.com/guides/mail">
+    Official mail documentation
+  </Card>
+  
+  <Card title="Resend" icon="envelope" href="https://resend.com/">
+    Modern email API for developers
+  </Card>
+  
+  <Card title="Mailpit" icon="inbox" href="https://github.com/axllent/mailpit">
+    Email testing tool
+  </Card>
+  
+  <Card title="Edge Templates" icon="file-code" href="https://edgejs.dev/">
+    Template engine for emails
+  </Card>
+</CardGroup>

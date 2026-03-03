@@ -1,0 +1,365 @@
+---
+title: Authorization
+description: Role-based access control with Bouncer policies and permissions
+icon: shield-check
+---
+
+## Overview
+
+The AdonisJS Starter Kit implements a robust authorization system using **AdonisJS Bouncer** for policy-based access control. The system includes role-based permissions, resource-level authorization, and fine-grained access control.
+
+## Bouncer Policies
+
+Policies define who can perform what actions on resources. The starter kit uses policies to control access to users, tokens, and other resources.
+
+### User Policy
+
+The `UserPolicy` controls all user management operations:
+
+```typescript app/users/policies/user_policy.ts
+import { BasePolicy } from '@adonisjs/bouncer'
+import { AuthorizerResponse } from '@adonisjs/bouncer/types'
+import User from '#users/models/user'
+
+export default class UserPolicy extends BasePolicy {
+  // View list of all users
+  viewList(currentUser: User): AuthorizerResponse {
+    return currentUser.isAdmin
+  }
+
+  // View individual user details
+  view(currentUser: User, user: User): AuthorizerResponse {
+    return currentUser.isAdmin || currentUser.id === user.id
+  }
+
+  // Create new users
+  create(currentUser: User): AuthorizerResponse {
+    return currentUser.isAdmin
+  }
+
+  // Update user information
+  update(currentUser: User, user: User): AuthorizerResponse {
+    return currentUser.isAdmin || currentUser.id === user.id
+  }
+
+  // Delete users
+  delete(currentUser: User, user: User): AuthorizerResponse {
+    return currentUser.isAdmin && currentUser.id !== user.id
+  }
+
+  // Invite new users
+  invite(currentUser: User): AuthorizerResponse {
+    return currentUser.isAdmin
+  }
+}
+```
+
+<Info>
+**Policy Logic**: Admins have full access, while regular users can only view and update their own profiles.
+</Info>
+
+### Token Policy
+
+The `TokenPolicy` controls API token management:
+
+```typescript app/users/policies/token_policy.ts
+import { BasePolicy } from '@adonisjs/bouncer'
+import { AuthorizerResponse } from '@adonisjs/bouncer/types'
+import User from '#users/models/user'
+
+export default class TokenPolicy extends BasePolicy {
+  // Create API tokens
+  create(user: User): AuthorizerResponse {
+    return user.isAdmin
+  }
+
+  // View list of tokens
+  viewList(user: User): AuthorizerResponse {
+    return user.isAdmin
+  }
+}
+```
+
+## Using Policies in Controllers
+
+Authorize actions in your controllers using the `bouncer` service:
+
+```typescript app/users/controllers/users_controller.ts
+import type { HttpContext } from '@adonisjs/core/http'
+import UserPolicy from '#users/policies/user_policy'
+
+export default class UsersController {
+  public async index({ bouncer, inertia, request }: HttpContext) {
+    // Check if user can view list
+    await bouncer.with(UserPolicy).authorize('viewList')
+
+    // ... fetch and return users
+  }
+
+  public async update({ bouncer, params, request, response }: HttpContext) {
+    const user = await User.findOrFail(params.id)
+
+    // Check if current user can update this specific user
+    await bouncer.with(UserPolicy).authorize('update', user)
+
+    // ... update user
+  }
+
+  public async destroy({ bouncer, params, response }: HttpContext) {
+    const user = await User.findOrFail(params.id)
+
+    // Check if current user can delete this specific user
+    await bouncer.with(UserPolicy).authorize('delete', user)
+
+    await user.delete()
+    return response.redirect().toRoute('users.index')
+  }
+}
+```
+
+<Warning>
+If authorization fails, Bouncer throws an `E_AUTHORIZATION_FAILURE` exception which results in a 403 Forbidden response.
+</Warning>
+
+## Role System
+
+The starter kit includes a simple but effective role system:
+
+### Role Enum
+
+```typescript app/users/enums/role.ts
+enum Roles {
+  USER = 1,
+  ADMIN = 2,
+}
+
+export const RoleWeights = [Roles.USER, Roles.ADMIN]
+
+export default Roles
+```
+
+### User Model with Role
+
+```typescript app/users/models/user.ts
+import { belongsTo, column, computed } from '@adonisjs/lucid/orm'
+import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import Role from '#users/models/role'
+import Roles from '#users/enums/role'
+
+export default class User extends compose(BaseModel, AuthFinder) {
+  @column({ isPrimary: true })
+  declare id: number
+
+  @column()
+  declare roleId: number
+
+  @belongsTo(() => Role)
+  declare role: BelongsTo<typeof Role>
+
+  @computed()
+  get isAdmin() {
+    return this.roleId === Roles.ADMIN
+  }
+}
+```
+
+### Role Model
+
+```typescript app/users/models/role.ts
+import { DateTime } from 'luxon'
+import { column, hasMany } from '@adonisjs/lucid/orm'
+import type { HasMany } from '@adonisjs/lucid/types/relations'
+import User from '#users/models/user'
+import BaseModel from '#common/models/base_model'
+
+export default class Role extends BaseModel {
+  @column({ isPrimary: true })
+  declare id: number
+
+  @column()
+  declare name: string
+
+  @column()
+  declare description: string
+
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime
+
+  @hasMany(() => User)
+  declare users: HasMany<typeof User>
+}
+```
+
+## Authorization Patterns
+
+### Pattern 1: Resource-Level Authorization
+
+Check permissions on specific resources:
+
+```typescript
+const user = await User.findOrFail(userId)
+await bouncer.with(UserPolicy).authorize('update', user)
+```
+
+### Pattern 2: Action-Level Authorization
+
+Check permissions for general actions:
+
+```typescript
+await bouncer.with(UserPolicy).authorize('create')
+```
+
+### Pattern 3: Conditional Authorization
+
+Perform different actions based on permissions:
+
+```typescript
+if (await bouncer.with(UserPolicy).allows('viewList')) {
+  // Show full user list
+} else {
+  // Show limited view
+}
+```
+
+### Pattern 4: Authorization in Queries
+
+Filter queries based on permissions:
+
+```typescript
+const query = User.query()
+
+if (!currentUser.isAdmin) {
+  // Regular users can only see themselves
+  query.where('id', currentUser.id)
+}
+
+const users = await query.fetch()
+```
+
+## Abilities Configuration
+
+Define global abilities in `app/core/abilities/main.ts`:
+
+```typescript app/core/abilities/main.ts
+import { Bouncer } from '@adonisjs/bouncer'
+
+export const editUser = Bouncer.ability(() => {
+  return true
+})
+```
+
+<Note>
+Abilities are global authorization rules that can be referenced by name throughout your application.
+</Note>
+
+## Middleware Integration
+
+The Bouncer is initialized through middleware:
+
+```typescript app/core/middleware/initialize_bouncer_middleware.ts
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+
+export default class InitializeBouncerMiddleware {
+  async handle(ctx: HttpContext, next: NextFn) {
+    // Bouncer is automatically available via ctx.bouncer
+    return next()
+  }
+}
+```
+
+## Authorization in Templates
+
+Check permissions in your frontend templates:
+
+```tsx
+{auth.user?.isAdmin && (
+  <Button onClick={handleDelete}>
+    Delete User
+  </Button>
+)}
+```
+
+## Common Authorization Scenarios
+
+### Scenario 1: Admin-Only Actions
+
+```typescript
+public async destroy({ bouncer, params }: HttpContext) {
+  await bouncer.with(UserPolicy).authorize('delete')
+  // Only admins reach here
+}
+```
+
+### Scenario 2: Owner or Admin
+
+```typescript
+public async update({ bouncer, auth, params }: HttpContext) {
+  const resource = await Resource.findOrFail(params.id)
+  
+  if (resource.userId !== auth.user!.id) {
+    await bouncer.with(ResourcePolicy).authorize('updateAny')
+  }
+  
+  // Either owner or admin can proceed
+}
+```
+
+### Scenario 3: Self-Management
+
+```typescript
+public async updateProfile({ auth, request }: HttpContext) {
+  // Users can always update their own profile
+  const user = auth.user!
+  user.merge(await request.validateUsing(updateProfileValidator))
+  await user.save()
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Always Authorize" icon="shield-check">
+    Check permissions in every controller action that modifies data or shows sensitive information.
+  </Card>
+  <Card title="Resource-Specific" icon="fingerprint">
+    Pass the specific resource to policies when checking ownership or resource-level permissions.
+  </Card>
+  <Card title="Fail Securely" icon="lock">
+    Default to denying access. Only grant permissions explicitly.
+  </Card>
+  <Card title="Test Policies" icon="vial">
+    Write tests for your policies to ensure authorization logic works correctly.
+  </Card>
+</CardGroup>
+
+## Extending Authorization
+
+Create new policies for additional resources:
+
+```typescript
+import { BasePolicy } from '@adonisjs/bouncer'
+import User from '#users/models/user'
+import Post from '#posts/models/post'
+
+export default class PostPolicy extends BasePolicy {
+  create(user: User) {
+    return true // All authenticated users can create posts
+  }
+
+  update(user: User, post: Post) {
+    return user.id === post.userId || user.isAdmin
+  }
+
+  delete(user: User, post: Post) {
+    return user.id === post.userId || user.isAdmin
+  }
+}
+```
+
+<Check>
+**Secure by Default**: The authorization system ensures that only authorized users can perform sensitive actions.
+</Check>

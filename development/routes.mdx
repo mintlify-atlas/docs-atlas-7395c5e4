@@ -1,0 +1,455 @@
+---
+title: Routes
+description: Learn how to define and organize routes in the AdonisJS Starter Kit
+---
+
+The AdonisJS Starter Kit uses a modular routing system where routes are organized by feature modules for better maintainability.
+
+## Route Organization
+
+Routes are defined in feature-specific files:
+
+```
+apps/web/app/
+├── auth/
+│   └── routes.ts         # Authentication routes
+├── users/
+│   └── routes.ts         # User management routes
+├── marketing/
+│   └── routes.ts         # Marketing pages
+└── analytics/
+    └── routes.ts         # Analytics dashboard
+```
+
+<Note>
+  Routes are automatically loaded via the `preloads` array in `adonisrc.ts`. No need to manually import them.
+</Note>
+
+## Route Loading
+
+Routes are registered in `adonisrc.ts`:
+
+```typescript adonisrc.ts
+export default defineConfig({
+  preloads: [
+    () => import('#start/kernel'),
+    
+    // Marketing
+    () => import('#marketing/routes'),
+    
+    // Auth
+    () => import('#auth/start/view'),
+    () => import('#auth/start/events'),
+    () => import('#auth/routes'),
+    
+    // Users
+    () => import('#users/start/view'),
+    () => import('#users/start/events'),
+    () => import('#users/routes'),
+    
+    // Analytics
+    () => import('#analytics/routes'),
+  ],
+})
+```
+
+## Basic Routes
+
+### Simple Route
+
+```typescript app/marketing/routes.ts
+import router from '@adonisjs/core/services/router'
+
+const MarketingController = () => import('#marketing/controllers/marketing_controller')
+
+router.get('/', [MarketingController]).as('marketing.show')
+```
+
+### Route with Parameters
+
+```typescript
+router.get('/posts/:id', [PostsController, 'show']).as('posts.show')
+router.get('/posts/:slug', [PostsController, 'showBySlug']).as('posts.show.slug')
+```
+
+## Authentication Routes
+
+Here are the actual authentication routes from the starter kit:
+
+```typescript app/auth/routes.ts
+import router from '@adonisjs/core/services/router'
+import { middleware } from '#start/kernel'
+
+const SignInController = () => import('#auth/controllers/sign_in_controller')
+const SignOutController = () => import('#auth/controllers/sign_out_controller')
+const SignUpController = () => import('#auth/controllers/sign_up_controller')
+const ForgotPasswordController = () => import('#auth/controllers/forgot_password_controller')
+const ResetPasswordController = () => import('#auth/controllers/reset_password_controller')
+const SocialController = () => import('#auth/controllers/social_controller')
+
+// Sign in
+router.get('/login', [SignInController, 'show'])
+  .use(middleware.guest())
+  .as('auth.sign_in.show')
+router.post('/login', [SignInController])
+
+// Sign out
+router.get('/logout', [SignOutController]).as('auth.sign_out.show')
+
+// Sign up
+router.get('/sign-up', [SignUpController, 'show'])
+  .use(middleware.guest())
+  .as('auth.sign_up.show')
+router.post('/sign-up', [SignUpController])
+  .use(middleware.guest())
+  .as('auth.sign_up.handle')
+
+// Password reset
+router.get('/forgot-password', [ForgotPasswordController, 'show'])
+  .as('auth.forgot_password.show')
+  .use(middleware.guest())
+router.post('/forgot-password', [ForgotPasswordController])
+  .as('auth.forgot_password.handle')
+
+router.get('/reset-password/:token', [ResetPasswordController, 'show'])
+  .use(middleware.guest())
+  .as('auth.reset_password.show')
+router.post('/reset-password/:token', [ResetPasswordController])
+  .use(middleware.guest())
+  .as('auth.reset_password.handle')
+
+// Social authentication
+router.get('/:provider/redirect', [SocialController, 'redirect'])
+  .where('provider', /google/)
+  .as('social.create')
+router.get('/:provider/callback', [SocialController, 'callback'])
+  .where('provider', /google/)
+
+// Locale switching
+router.get('/switch/:locale', () => {})
+  .use(middleware.switchLocale())
+```
+
+<Tip>
+  Use the `guest()` middleware to prevent authenticated users from accessing routes like login and signup.
+</Tip>
+
+## Resource Routes
+
+Resource routes provide CRUD operations:
+
+```typescript app/users/routes.ts
+import router from '@adonisjs/core/services/router'
+import { middleware } from '#start/kernel'
+
+const UsersController = () => import('#users/controllers/users_controller')
+
+// Create all CRUD routes (index, create, store, show, edit, update, destroy)
+router.resource('/users', UsersController)
+  .use('*', middleware.auth())
+  .as('users')
+
+// Or limit to specific actions
+router.resource('/users', UsersController)
+  .only(['index', 'store', 'update', 'destroy'])
+  .use('*', middleware.auth())
+  .as('users')
+```
+
+Resource routes generate:
+
+| Verb | URI | Action | Route Name |
+|------|-----|--------|------------|
+| GET | /users | index | users.index |
+| GET | /users/create | create | users.create |
+| POST | /users | store | users.store |
+| GET | /users/:id | show | users.show |
+| GET | /users/:id/edit | edit | users.edit |
+| PUT/PATCH | /users/:id | update | users.update |
+| DELETE | /users/:id | destroy | users.destroy |
+
+## Nested Routes
+
+Here's the user settings route structure from the starter kit:
+
+```typescript app/users/routes.ts
+import router from '@adonisjs/core/services/router'
+import { middleware } from '#start/kernel'
+
+const ProfileController = () => import('#users/controllers/profile_controller')
+const PasswordController = () => import('#users/controllers/password_controller')
+const TokensController = () => import('#users/controllers/tokens_controller')
+
+// Settings redirect
+router.get('/settings', ({ response }) => {
+  return response.redirect().toRoute('profile.show')
+})
+  .middleware(middleware.auth())
+  .as('settings.index')
+
+// Profile settings
+router.get('/settings/profile', [ProfileController, 'show'])
+  .middleware(middleware.auth())
+  .as('profile.show')
+router.put('/settings/profile', [ProfileController])
+  .middleware(middleware.auth())
+
+// Password settings
+router.get('/settings/password', [PasswordController, 'show'])
+  .middleware(middleware.auth())
+  .as('password.show')
+router.put('/settings/password', [PasswordController])
+  .middleware(middleware.auth())
+
+// API tokens
+router.resource('/settings/tokens', TokensController)
+  .only(['index', 'destroy'])
+  .middleware('*', middleware.auth())
+  .as('tokens')
+router.post('/api/tokens', [TokensController, 'store'])
+  .middleware(middleware.auth())
+
+// Appearance settings
+router.get('/settings/appearance', ({ inertia }) => {
+  return inertia.render('users/appearance')
+})
+  .middleware(middleware.auth())
+  .as('appearance.show')
+```
+
+## Middleware
+
+### Applying Middleware
+
+<CodeGroup>
+```typescript Single route
+router.get('/dashboard', [DashboardController])
+  .middleware(middleware.auth())
+```
+
+```typescript Multiple middleware
+router.get('/admin', [AdminController])
+  .middleware([middleware.auth(), middleware.admin()])
+```
+
+```typescript Resource routes
+router.resource('/posts', PostsController)
+  .use('*', middleware.auth())
+  .use(['store', 'update'], middleware.can('editPosts'))
+```
+</CodeGroup>
+
+### Available Middleware
+
+The starter kit includes:
+
+- `auth()` - Require authentication
+- `guest()` - Require no authentication
+- `switchLocale()` - Switch user locale
+- `detectUserLocale()` - Auto-detect locale
+- `initializeBouncer()` - Load authorization
+- `containerBindings()` - Initialize container
+
+## Named Routes
+
+Always name your routes for easy reference:
+
+```typescript
+router.get('/users/:id', [UsersController, 'show'])
+  .as('users.show')
+
+router.post('/users/:id/follow', [FollowController])
+  .as('users.follow')
+```
+
+### Using Named Routes
+
+<CodeGroup>
+```typescript In controllers
+import router from '@adonisjs/core/services/router'
+
+export default class PostsController {
+  async store({ response }: HttpContext) {
+    // ...
+    return response.redirect().toRoute('posts.show', { id: post.id })
+  }
+}
+```
+
+```tsx In React components
+import { Link } from '@tuyau/inertia/react'
+
+<Link route="users.show" params={{ id: user.id }}>
+  View Profile
+</Link>
+```
+</CodeGroup>
+
+## Route Parameters
+
+### Required Parameters
+
+```typescript
+router.get('/users/:id', [UsersController, 'show'])
+router.get('/posts/:slug', [PostsController, 'showBySlug'])
+```
+
+### Optional Parameters
+
+```typescript
+router.get('/search/:query?', [SearchController])
+```
+
+### Parameter Constraints
+
+```typescript
+router.get('/users/:id', [UsersController])
+  .where('id', /^[0-9]+$/)
+
+router.get('/:provider/callback', [SocialController])
+  .where('provider', /google|github|facebook/)
+```
+
+## Route Groups
+
+Group related routes:
+
+```typescript
+router.group(() => {
+  router.get('/profile', [ProfileController, 'show'])
+  router.put('/profile', [ProfileController, 'update'])
+  router.get('/password', [PasswordController, 'show'])
+  router.put('/password', [PasswordController, 'update'])
+})
+  .prefix('/settings')
+  .middleware(middleware.auth())
+  .as('settings')
+```
+
+## API Routes
+
+Define API routes separately:
+
+```typescript
+router.group(() => {
+  router.post('/tokens', [TokensController, 'store'])
+  router.delete('/tokens/:id', [TokensController, 'destroy'])
+  
+  router.get('/users', [ApiUsersController, 'index'])
+  router.get('/users/:id', [ApiUsersController, 'show'])
+})
+  .prefix('/api')
+  .middleware([middleware.auth()])
+```
+
+<Note>
+  The starter kit uses Inertia.js for most routes. API routes are primarily used for token management and AJAX requests.
+</Note>
+
+## Redirects
+
+```typescript
+// Simple redirect
+router.get('/settings', ({ response }) => {
+  return response.redirect().toRoute('profile.show')
+})
+
+// Conditional redirect
+router.get('/dashboard', ({ auth, response }) => {
+  if (!auth.user) {
+    return response.redirect().toRoute('auth.sign_in.show')
+  }
+  // ...
+})
+```
+
+## Route Testing
+
+Test your routes:
+
+```typescript
+import { test } from '@japa/runner'
+
+test.group('Auth routes', () => {
+  test('GET /login displays login page', async ({ client }) => {
+    const response = await client.get('/login')
+    response.assertStatus(200)
+  })
+  
+  test('POST /login authenticates user', async ({ client }) => {
+    const response = await client.post('/login').json({
+      email: 'admin@repo.com',
+      password: '123',
+    })
+    response.assertRedirectsTo('/')
+  })
+  
+  test('authenticated users cannot access /login', async ({ client }) => {
+    const response = await client
+      .get('/login')
+      .loginAs(user)
+    
+    response.assertRedirectsTo('/')
+  })
+})
+```
+
+## Listing Routes
+
+View all registered routes:
+
+```bash
+node ace list:routes
+```
+
+Output:
+```
+┌──────────┬───────────────────────────┬─────────────────────┬──────────────┐
+│ Method   │ Route                     │ Handler             │ Name         │
+├──────────┼───────────────────────────┼─────────────────────┼──────────────┤
+│ GET      │ /                         │ MarketingController │ marketing... │
+│ GET      │ /login                    │ SignInController    │ auth.sign... │
+│ POST     │ /login                    │ SignInController    │              │
+│ GET      │ /users                    │ UsersController     │ users.index  │
+└──────────┴───────────────────────────┴─────────────────────┴──────────────┘
+```
+
+<Tip>
+  Filter routes by pattern: `node ace list:routes --pattern=/users`
+</Tip>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always name your routes">
+    Named routes make refactoring easier and prevent broken links when URLs change.
+  </Accordion>
+
+  <Accordion title="Use resource routes for CRUD">
+    Resource routes follow RESTful conventions and reduce boilerplate.
+  </Accordion>
+
+  <Accordion title="Organize by feature">
+    Keep routes in their respective feature modules, not in a single file.
+  </Accordion>
+
+  <Accordion title="Use middleware consistently">
+    Apply authentication and authorization middleware to protect routes.
+  </Accordion>
+
+  <Accordion title="Keep route files focused">
+    Each route file should handle a specific feature or domain area.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Models" icon="cubes" href="/development/models">
+    Learn about Lucid ORM models
+  </Card>
+  
+  <Card title="Frontend" icon="react" href="/development/frontend">
+    Build UIs with React and Inertia.js
+  </Card>
+</CardGroup>

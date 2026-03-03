@@ -1,0 +1,420 @@
+---
+title: Frontend Development
+description: Build modern UIs with React, Inertia.js, and TypeScript in the AdonisJS Starter Kit
+---
+
+The AdonisJS Starter Kit uses **React**, **Inertia.js**, and **TypeScript** for building interactive frontend experiences with server-side rendering (SSR) support.
+
+## Tech Stack
+
+<CardGroup cols={3}>
+  <Card title="React 19" icon="react">
+    Modern React with hooks and concurrent features
+  </Card>
+  
+  <Card title="Inertia.js" icon="layer-group">
+    Build SPAs without building an API
+  </Card>
+  
+  <Card title="TypeScript" icon="code">
+    Type-safe frontend development
+  </Card>
+  
+  <Card title="Vite" icon="bolt">
+    Lightning-fast HMR and builds
+  </Card>
+  
+  <Card title="ShadCN UI" icon="palette">
+    Beautiful, accessible components
+  </Card>
+  
+  <Card title="Tailwind CSS" icon="paintbrush">
+    Utility-first CSS framework
+  </Card>
+</CardGroup>
+
+## Project Structure
+
+Frontend code is organized by feature modules:
+
+```
+apps/web/app/
+├── auth/
+│   └── ui/
+│       ├── pages/           # Inertia pages
+│       ├── components/      # Feature components
+│       └── hooks/           # Custom React hooks
+├── users/
+│   └── ui/
+│       ├── pages/
+│       ├── components/
+│       └── context/
+├── marketing/
+│   └── ui/
+└── common/
+    └── ui/
+        ├── components/      # Shared components
+        ├── hooks/
+        └── icons/
+```
+
+<Note>
+  Each feature module contains its own UI code, keeping frontend logic co-located with backend code.
+</Note>
+
+## Inertia.js Configuration
+
+Inertia.js bridges your AdonisJS backend with React frontend:
+
+```typescript config/inertia.ts
+import { defineConfig } from '@adonisjs/inertia'
+import type { InferSharedProps } from '@adonisjs/inertia/types'
+
+const inertiaConfig = defineConfig({
+  rootView: 'inertia_layout',
+  
+  sharedData: {
+    locale: (ctx) => ctx.inertia.always(() => 
+      ctx.i18n?.locale || i18nManager.config.defaultLocale
+    ),
+    user: async (ctx) => {
+      if (ctx.auth?.user) {
+        await User.preComputeUrls(ctx.auth?.user)
+        return new UserDto(ctx.auth?.user)
+      }
+    },
+    flashMessages: (ctx) => ctx.session?.flashMessages.all(),
+    abilities: (ctx) => {
+      if (!ctx.auth?.user) return []
+      return new AbilitiesService().getAllAbilities(ctx.auth?.user)
+    },
+  },
+  
+  ssr: {
+    enabled: true,
+    entrypoint: 'app/core/ui/app/ssr.tsx',
+    pages: (_, page) => isSSREnableForPage(page),
+  },
+})
+
+export default inertiaConfig
+```
+
+<Tip>
+  Shared data is automatically available to all Inertia pages without prop drilling.
+</Tip>
+
+## Creating Pages
+
+Inertia pages are React components that are rendered by your AdonisJS controllers.
+
+### Simple Page Example
+
+```tsx app/auth/ui/pages/sign_in.tsx
+import { LoginForm } from '#auth/ui/components/login_form'
+import AuthLayout from '#auth/ui/components/layout'
+
+export default function SignInPage() {
+  return (
+    <AuthLayout>
+      <LoginForm />
+    </AuthLayout>
+  )
+}
+```
+
+### Controller Rendering
+
+```typescript app/auth/controllers/sign_in_controller.ts
+import { HttpContext } from '@adonisjs/core/http'
+
+export default class SignInController {
+  async show({ inertia }: HttpContext) {
+    return inertia.render('auth/sign_in')
+  }
+}
+```
+
+## Working with Forms
+
+Inertia provides a powerful form helper for handling form state and submissions.
+
+### Form Example from Login
+
+Here's the actual login form from the starter kit:
+
+```tsx app/auth/ui/components/login_form.tsx
+import { useForm } from '@inertiajs/react'
+import { Link } from '@tuyau/inertia/react'
+import { Button } from '@workspace/ui/components/button'
+import { Input } from '@workspace/ui/components/input'
+import { PasswordInput } from '@workspace/ui/components/password-input'
+import {
+  FieldSet,
+  FieldGroup,
+  Field,
+  FieldLabel,
+} from '@workspace/ui/components/field'
+import { FieldErrorBag } from '@workspace/ui/components/field-error-bag'
+
+export function LoginForm() {
+  const { data, setData, errors, post } = useForm({
+    email: '',
+    password: '',
+  })
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    post('/login')
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+      <FieldSet>
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor="email">Email</FieldLabel>
+            <Input
+              id="email"
+              type="email"
+              value={data.email}
+              onChange={(e) => setData('email', e.target.value)}
+              placeholder="m@example.com"
+              required
+            />
+            <FieldErrorBag errors={errors} field="email" />
+          </Field>
+          
+          <Field>
+            <FieldLabel htmlFor="password">Password</FieldLabel>
+            <PasswordInput
+              id="password"
+              value={data.password}
+              onChange={(e) => setData('password', e.target.value)}
+              placeholder="Enter your password"
+              required
+            />
+            <FieldErrorBag errors={errors} field="password" />
+          </Field>
+
+          <Field orientation="responsive">
+            <Button type="submit">Sign In</Button>
+          </Field>
+        </FieldGroup>
+      </FieldSet>
+    </form>
+  )
+}
+```
+
+<Note>
+  The `useForm` hook automatically handles form state, validation errors, and loading states.
+</Note>
+
+## Navigation
+
+Use the type-safe Tuyau router for navigation:
+
+```tsx
+import { Link, useTuyau } from '@tuyau/inertia/react'
+
+// Link component
+<Link route="auth.sign_in.show">
+  Sign In
+</Link>
+
+// Programmatic navigation
+function MyComponent() {
+  const tuyau = useTuyau()
+  
+  const navigate = () => {
+    tuyau.navigate('users.index')
+  }
+  
+  return <button onClick={navigate}>Go to Users</button>
+}
+```
+
+<Tip>
+  Tuyau provides full TypeScript autocomplete for your routes and parameters.
+</Tip>
+
+## Using Shared Data
+
+Access shared data (user, locale, etc.) via `usePage`:
+
+```tsx
+import { usePage } from '@inertiajs/react'
+
+function Header() {
+  const { user, locale } = usePage().props
+  
+  return (
+    <header>
+      <p>Welcome, {user?.fullName}</p>
+      <p>Locale: {locale}</p>
+    </header>
+  )
+}
+```
+
+## Server-Side Rendering (SSR)
+
+The starter kit includes SSR support for improved performance and SEO.
+
+### SSR Configuration
+
+SSR is configured in `config/inertia.ts`:
+
+```typescript
+ssr: {
+  enabled: true,
+  entrypoint: 'app/core/ui/app/ssr.tsx',
+  pages: (_, page) => isSSREnableForPage(page),
+}
+```
+
+### Building for Production
+
+<CodeGroup>
+```bash Build frontend
+node ace vite:build
+```
+
+```bash Build with SSR
+node ace vite:build --ssr
+```
+</CodeGroup>
+
+## Internationalization (i18n)
+
+The starter kit includes built-in i18n support:
+
+```tsx
+import { useTranslation } from '#common/ui/hooks/use_translation'
+
+function MyComponent() {
+  const { t } = useTranslation()
+  
+  return (
+    <div>
+      <h1>{t('auth.signin.title')}</h1>
+      <p>{t('auth.signin.description')}</p>
+    </div>
+  )
+}
+```
+
+## Custom Hooks
+
+The starter kit includes several useful hooks:
+
+### useFlashMessage
+
+```tsx
+import useFlashMessage from '#common/ui/hooks/use_flash_message'
+
+function MyComponent() {
+  const successMessage = useFlashMessage('success')
+  const errorMessages = useFlashMessage('errorsBag')
+  
+  return (
+    <div>
+      {successMessage && <div className="success">{successMessage}</div>}
+      {errorMessages && <div className="error">{errorMessages}</div>}
+    </div>
+  )
+}
+```
+
+### useUser
+
+```tsx
+import { useUser } from '#auth/ui/hooks/use_user'
+
+function MyComponent() {
+  const { user, isAdmin } = useUser()
+  
+  return (
+    <div>
+      {isAdmin && <AdminPanel />}
+    </div>
+  )
+}
+```
+
+## Development Workflow
+
+<Steps>
+  <Step title="Start the dev server">
+    ```bash
+    npm run dev
+    ```
+    This starts both the AdonisJS server and Vite dev server with HMR.
+  </Step>
+  
+  <Step title="Edit your components">
+    Make changes to your React components in `app/*/ui/` directories.
+  </Step>
+  
+  <Step title="Hot Module Replacement">
+    Changes are reflected instantly thanks to Vite's HMR.
+  </Step>
+</Steps>
+
+## Type Safety
+
+The starter kit provides full TypeScript support:
+
+<CodeGroup>
+```typescript Shared props types
+import type { SharedProps } from '@adonisjs/inertia/types'
+
+function MyComponent() {
+  const { user } = usePage<SharedProps>().props
+  // user is fully typed!
+}
+```
+
+```typescript Page props
+import type { InferPageProps } from '@adonisjs/inertia/types'
+
+type PageProps = InferPageProps<typeof UsersController.index>
+
+function UsersPage({ users }: PageProps) {
+  // users is fully typed!
+}
+```
+</CodeGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Keep pages simple">
+    Pages should be thin wrappers that compose components. Put business logic in hooks and context providers.
+  </Accordion>
+
+  <Accordion title="Co-locate feature code">
+    Keep feature-specific UI code in the same module as the backend code. Only truly shared components go in `common/ui`.
+  </Accordion>
+
+  <Accordion title="Use the Inertia form helper">
+    The `useForm` hook handles all form state, validation, and loading states automatically. Don't manage this manually.
+  </Accordion>
+
+  <Accordion title="Leverage shared data">
+    Put data needed across many pages in the Inertia shared data config instead of passing it through every controller.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="UI Components" icon="palette" href="/development/ui-components">
+    Learn about the ShadCN UI component library
+  </Card>
+  
+  <Card title="Routes" icon="route" href="/development/routes">
+    Understand the routing system
+  </Card>
+</CardGroup>

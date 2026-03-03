@@ -1,0 +1,177 @@
+---
+title: Creating Modules
+description: Learn how to create and use modules to organize your AdonisJS application
+---
+
+The AdonisJS Starter Kit supports a modular architecture powered by [@adonisjs-community/modules](https://github.com/adonisjs-community/modules), allowing you to scaffold your application into feature-based subdirectories for better organization, maintainability, and scalability.
+
+## Why Use Modules?
+
+Modules help you:
+- Organize code by feature instead of by type
+- Scale large applications with many features
+- Group related files together for better maintainability
+- Create clear boundaries between different parts of your application
+
+## Installation
+
+<Steps>
+  <Step title="Install the modules package">
+    Run the following command to add the modules package to your project:
+
+    ```bash
+    node ace add @adonisjs-community/modules
+    ```
+
+    This will install the package and configure it for your AdonisJS application.
+  </Step>
+</Steps>
+
+## Creating a Module
+
+<Steps>
+  <Step title="Generate a new module">
+    Use the `make:module` command to create a new module:
+
+    ```bash
+    node ace make:module users
+    ```
+
+    This creates a new module directory in the `app/` folder with the following structure:
+
+    ```
+    ├── apps/
+    │   └── web/
+    │       └── app/
+    │           └── users/
+    │               ├── controllers/
+    │               ├── models/
+    │               ├── services/
+    │               ├── validators/
+    │               └── ...
+    ```
+  </Step>
+
+  <Step title="Verify the path alias">
+    After creating a module, an alias is automatically added to your `package.json` for module path resolution:
+
+    ```json package.json
+    {
+      "imports": {
+        "#users/*": "./app/users/*.js"
+      }
+    }
+    ```
+
+    This allows you to import files from the module using the `#users/` prefix:
+
+    ```typescript
+    import User from '#users/models/user'
+    import UsersController from '#users/controllers/users_controller'
+    ```
+  </Step>
+</Steps>
+
+## Generating Files Inside a Module
+
+After creating a module, you can use standard AdonisJS `make` commands with the `--module` or `-m` flag to generate scoped resources:
+
+<Steps>
+  <Step title="Generate a controller">
+    ```bash
+    node ace make:controller profile -m=users
+    ```
+
+    This creates a controller at `app/users/controllers/profile_controller.ts`.
+  </Step>
+
+  <Step title="Generate a model">
+    ```bash
+    node ace make:model user -m=users
+    ```
+
+    This creates a model at `app/users/models/user.ts`.
+  </Step>
+
+  <Step title="Generate a validator">
+    ```bash
+    node ace make:validator create_user -m=users
+    ```
+
+    This creates a validator at `app/users/validators/create_user.ts`.
+  </Step>
+</Steps>
+
+## Module Structure Example
+
+The starter kit comes with several pre-built modules. Here's the structure of the `users` module:
+
+```
+app/users/
+├── controllers/       # HTTP controllers
+├── database/         # Module-specific migrations and seeders
+│   └── seeders/
+├── dtos/             # Data Transfer Objects
+├── enums/            # Enumerations
+├── mails/            # Email templates
+├── models/           # Database models
+├── policies/         # Authorization policies
+├── resources/        # API resources
+├── routes.ts         # Module routes
+├── services/         # Business logic
+├── start/            # Module initialization
+├── types/            # TypeScript types
+├── ui/               # Frontend components
+└── validators.ts     # Validation schemas
+```
+
+## Module Routes
+
+Each module can have its own `routes.ts` file to define module-specific routes:
+
+```typescript app/users/routes.ts
+import { middleware } from '#start/kernel'
+import router from '@adonisjs/core/services/router'
+
+const UsersController = () => import('#users/controllers/users_controller')
+const ProfileController = () => import('#users/controllers/profile_controller')
+
+router
+  .resource('/users', UsersController)
+  .only(['index', 'store', 'update', 'destroy'])
+  .use('*', middleware.auth())
+  .as('users')
+
+router.put('/settings/profile', [ProfileController]).middleware(middleware.auth())
+```
+
+## Best Practices
+
+<Card title="Keep modules focused">
+  Each module should represent a single feature or domain concept. For example: `users`, `auth`, `billing`, `analytics`.
+</Card>
+
+<Card title="Use path aliases">
+  Always use the generated path aliases (e.g., `#users/*`) instead of relative paths for better maintainability.
+</Card>
+
+<Card title="Organize by feature, not by type">
+  Instead of having all controllers in one place, group related controllers, models, and services together in a module.
+</Card>
+
+<Card title="Keep shared code separate">
+  If code is used across multiple modules, consider placing it in a common module or shared utilities folder.
+</Card>
+
+## Example Modules in the Starter Kit
+
+The starter kit includes these modules out of the box:
+
+- **auth** - Authentication and authorization
+- **users** - User management and profiles
+- **common** - Shared utilities and components
+- **core** - Core application functionality
+- **marketing** - Marketing pages and content
+- **analytics** - Analytics and tracking
+
+You can use these as examples when creating your own modules.

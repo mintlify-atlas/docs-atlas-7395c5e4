@@ -1,0 +1,439 @@
+---
+title: Internationalization (i18n)
+description: Multi-language support with AdonisJS i18n and automatic locale detection
+icon: globe
+---
+
+## Overview
+
+The AdonisJS Starter Kit includes comprehensive internationalization support using **AdonisJS i18n**. The system supports multiple languages with automatic locale detection based on browser preferences, custom headers, or cookies.
+
+## Supported Languages
+
+The starter kit comes pre-configured with:
+
+- **English (en)** - Default
+- **French (fr)**
+- **Portuguese (pt)**
+
+## Configuration
+
+### i18n Configuration
+
+```typescript config/i18n.ts
+import app from '@adonisjs/core/services/app'
+import { defineConfig, formatters, loaders } from '@adonisjs/i18n'
+
+const i18nConfig = defineConfig({
+  defaultLocale: 'en',
+  supportedLocales: ['en', 'fr', 'pt'],
+  formatter: formatters.icu(),
+
+  loaders: [
+    loaders.fs({
+      location: app.makePath('app/users/resources/lang'),
+    }),
+    loaders.fs({
+      location: app.makePath('app/common/resources/lang'),
+    }),
+    loaders.fs({
+      location: app.makePath('app/auth/resources/lang'),
+    }),
+  ],
+})
+
+export default i18nConfig
+```
+
+<Info>
+**Modular Structure**: Translation files are organized by feature module (users, auth, common) for better maintainability.
+</Info>
+
+## Locale Detection
+
+The `DetectUserLocaleMiddleware` automatically detects the user's preferred language:
+
+```typescript app/core/middleware/detect_user_locale_middleware.ts
+import { I18n } from '@adonisjs/i18n'
+import i18nManager from '@adonisjs/i18n/services/main'
+import type { NextFn } from '@adonisjs/core/types/http'
+import { type HttpContext } from '@adonisjs/core/http'
+
+export default class DetectUserLocaleMiddleware {
+  protected getRequestLocale(ctx: HttpContext) {
+    const supportedLocales = i18nManager.supportedLocales()
+
+    // 1. Check custom header
+    const customHeaderLocale = ctx.request.header('X-User-Language')
+    if (customHeaderLocale && supportedLocales.includes(customHeaderLocale)) {
+      return customHeaderLocale
+    }
+
+    // 2. Check cookie
+    const cookieLocale = ctx.request.cookie('user-locale')
+    if (cookieLocale && supportedLocales.includes(cookieLocale)) {
+      return cookieLocale
+    }
+
+    // 3. Fallback to Accept-Language header
+    const userLanguages = ctx.request.languages()
+    return i18nManager.getSupportedLocaleFor(userLanguages) ?? i18nManager.defaultLocale
+  }
+
+  async handle(ctx: HttpContext, next: NextFn) {
+    const language = this.getRequestLocale(ctx)
+    
+    // Update cookie if necessary
+    if (!ctx.request.cookie('user-locale') || ctx.request.cookie('user-locale') !== language) {
+      ctx.response.cookie('user-locale', language, {
+        httpOnly: true,
+        path: '/',
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+        sameSite: true,
+      })
+    }
+
+    // Set i18n instance
+    ctx.i18n = i18nManager.locale(language || i18nManager.defaultLocale)
+    ctx.containerResolver.bindValue(I18n, ctx.i18n)
+
+    // Share with templates
+    if ('view' in ctx) {
+      ctx.view.share({ i18n: ctx.i18n })
+    }
+
+    return next()
+  }
+}
+
+declare module '@adonisjs/core/http' {
+  export interface HttpContext {
+    i18n: I18n
+  }
+}
+```
+
+### Detection Priority
+
+<Steps>
+  <Step title="Custom Header">
+    Check `X-User-Language` header for explicit language preference.
+  </Step>
+  <Step title="Cookie">
+    Check `user-locale` cookie for saved preference.
+  </Step>
+  <Step title="Accept-Language">
+    Parse browser's `Accept-Language` header to find best match.
+  </Step>
+  <Step title="Default Locale">
+    Fall back to configured default locale (English).
+  </Step>
+</Steps>
+
+## Switching Languages
+
+### Switch Locale Middleware
+
+Users can switch languages via a dedicated route:
+
+```typescript app/common/middlewares/switch_locale_middleware.ts
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+
+export default class SwitchLocaleMiddleware {
+  async handle(ctx: HttpContext, next: NextFn) {
+    ctx.response.cookie('user-locale', ctx.params.locale, {
+      httpOnly: true,
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      sameSite: true,
+    })
+
+    ctx.response.redirect().back()
+
+    return await next()
+  }
+}
+```
+
+### Switch Locale Route
+
+```typescript app/auth/routes.ts
+import router from '@adonisjs/core/services/router'
+import { middleware } from '#start/kernel'
+
+router.get('/switch/:locale', () => {})
+  .use(middleware.switchLocale())
+```
+
+<Note>
+After switching, users are redirected back to the previous page with the new locale applied.
+</Note>
+
+## Translation Files
+
+### File Structure
+
+```
+app/
+├── auth/
+│   └── resources/
+│       └── lang/
+│           ├── en/
+│           │   ├── auth.json
+│           │   └── errors.json
+│           ├── fr/
+│           │   ├── auth.json
+│           │   └── errors.json
+│           └── pt/
+│               ├── auth.json
+│               └── errors.json
+├── users/
+│   └── resources/
+│       └── lang/
+│           ├── en/
+│           │   └── users.json
+│           ├── fr/
+│           │   └── users.json
+│           └── pt/
+│               └── users.json
+└── common/
+    └── resources/
+        └── lang/
+            └── ...
+```
+
+### Example Translation File
+
+```json app/auth/resources/lang/en/auth.json
+{
+  "signin": {
+    "title": "Sign in to your account",
+    "description": "Enter your email below to access your account",
+    "form": {
+      "email": {
+        "label": "Email",
+        "placeholder": "Enter your email"
+      },
+      "password": {
+        "label": "Password",
+        "placeholder": "Enter your password"
+      }
+    },
+    "actions": {
+      "forgot_password": "Forgot your password?",
+      "submit": "Sign In",
+      "google": "Sign in with Google"
+    }
+  },
+  "registration": {
+    "title": "Create your account",
+    "form": {
+      "full_name": {
+        "label": "Full Name",
+        "placeholder": "Your full name"
+      }
+    }
+  }
+}
+```
+
+## Using Translations
+
+### In Controllers
+
+Access translations via the `i18n` service:
+
+```typescript
+export default class SignInController {
+  async handle({ i18n, session }: HttpContext) {
+    session.flashErrors({
+      E_TOO_MANY_REQUESTS: i18n.t('errors.E_TOO_MANY_REQUESTS'),
+    })
+  }
+}
+```
+
+### In Validators
+
+Configure validators to use i18n for validation messages:
+
+```typescript app/auth/validators.ts
+import vine from '@vinejs/vine'
+import i18nManager from '@adonisjs/i18n/services/main'
+
+const i18n = i18nManager.locale('fr')
+vine.messagesProvider = i18n.createMessagesProvider()
+
+export const signUpValidator = vine.compile(
+  vine.object({
+    fullName: vine.string().trim().minLength(3).maxLength(255),
+    email: vine.string().email().toLowerCase().trim(),
+    password: vine.string().minLength(1).confirmed(),
+  })
+)
+```
+
+### Validation Messages Provider
+
+The middleware automatically sets up validation messages:
+
+```typescript
+RequestValidator.messagesProvider = (ctx) => {
+  return ctx.i18n.createMessagesProvider()
+}
+```
+
+## ICU Message Format
+
+The starter kit uses **ICU message format** for advanced translations:
+
+### Variables
+
+```json
+{
+  "welcome": "Welcome {name}!"
+}
+```
+
+```typescript
+i18n.t('welcome', { name: 'John' })
+// Output: "Welcome John!"
+```
+
+### Pluralization
+
+```json
+{
+  "items": "{count, plural, =0 {no items} one {# item} other {# items}}"
+}
+```
+
+```typescript
+i18n.t('items', { count: 0 })  // "no items"
+i18n.t('items', { count: 1 })  // "1 item"
+i18n.t('items', { count: 5 })  // "5 items"
+```
+
+### Select Format
+
+```json
+{
+  "greeting": "{gender, select, male {Hello Mr. {name}} female {Hello Ms. {name}} other {Hello {name}}}"
+}
+```
+
+## Frontend Integration
+
+### Language Selector Component
+
+```tsx
+import { usePage } from '@inertiajs/react'
+
+export function LanguageSwitcher() {
+  const { i18n } = usePage().props
+  
+  return (
+    <select 
+      value={i18n.locale}
+      onChange={(e) => {
+        window.location.href = `/switch/${e.target.value}`
+      }}
+    >
+      <option value="en">English</option>
+      <option value="fr">Français</option>
+      <option value="pt">Português</option>
+    </select>
+  )
+}
+```
+
+### Using Translations in React
+
+Create a translation hook:
+
+```typescript app/common/ui/hooks/use_translation.ts
+import { usePage } from '@inertiajs/react'
+
+export function useTranslation() {
+  const { i18n } = usePage().props
+  
+  const t = (key: string, data?: Record<string, any>) => {
+    return i18n.t(key, data)
+  }
+  
+  return { t, locale: i18n.locale }
+}
+```
+
+Use in components:
+
+```tsx
+import { useTranslation } from '#common/ui/hooks/use_translation'
+
+export function SignInForm() {
+  const { t } = useTranslation()
+  
+  return (
+    <div>
+      <h1>{t('auth.signin.title')}</h1>
+      <p>{t('auth.signin.description')}</p>
+    </div>
+  )
+}
+```
+
+## Email Translations
+
+Emails also support internationalization:
+
+```json
+{
+  "emails": {
+    "reset_password": {
+      "subject": "Reset your password",
+      "title": "Oops!",
+      "subtitle": "It seems that you've forgotten your password.",
+      "action_btn": "Reset Password"
+    }
+  }
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Consistent Keys" icon="hashtag">
+    Use consistent, hierarchical key names (e.g., `module.component.field.label`).
+  </Card>
+  <Card title="Default Values" icon="circle-check">
+    Always provide English translations as fallback values.
+  </Card>
+  <Card title="Context" icon="message-lines">
+    Include context in key names to avoid ambiguity (`button.submit` vs `form.submit`).
+  </Card>
+  <Card title="Plurals" icon="list-ol">
+    Use ICU plural format for count-based messages.
+  </Card>
+</CardGroup>
+
+## Adding New Languages
+
+<Steps>
+  <Step title="Update Config">
+    Add the locale code to `supportedLocales` in `config/i18n.ts`.
+  </Step>
+  <Step title="Create Directories">
+    Create new language directories in each module's `resources/lang/` folder.
+  </Step>
+  <Step title="Translate Content">
+    Copy English JSON files and translate all values.
+  </Step>
+  <Step title="Test">
+    Test translations by switching locale via cookie or header.
+  </Step>
+</Steps>
+
+<Check>
+**Fully Internationalized**: The entire application supports multiple languages with automatic detection and easy switching.
+</Check>

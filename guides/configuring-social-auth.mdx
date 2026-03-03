@@ -1,0 +1,291 @@
+---
+title: Configuring Social Authentication
+description: Set up social authentication with Google, GitHub, and other providers
+---
+
+The AdonisJS Starter Kit includes built-in social authentication support using the [@adonisjs/ally](https://docs.adonisjs.com/guides/authentication/social-authentication) package. This allows users to sign in with their Google, GitHub, or other social provider accounts.
+
+## Overview
+
+The social authentication flow:
+1. User clicks "Sign in with Google" (or another provider)
+2. User is redirected to the provider's OAuth page
+3. User authorizes your application
+4. Provider redirects back to your app with user data
+5. User is automatically created or logged in
+
+## Setting Up Google Authentication
+
+<Steps>
+  <Step title="Create Google OAuth credentials">
+    1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
+    2. Create a new project or select an existing one
+    3. Navigate to **APIs & Services** → **Credentials**
+    4. Click **Create Credentials** → **OAuth client ID**
+    5. Select **Web application** as the application type
+    6. Add authorized redirect URIs:
+       - `http://localhost:3333/google/callback` (for development)
+       - `https://yourdomain.com/google/callback` (for production)
+    7. Copy the **Client ID** and **Client Secret**
+  </Step>
+
+  <Step title="Configure environment variables">
+    Add your Google credentials to the `.env` file:
+
+    ```bash .env
+    GOOGLE_CLIENT_ID=your_client_id_here
+    GOOGLE_CLIENT_SECRET=your_client_secret_here
+    VITE_API_URL=http://localhost:3333
+    ```
+
+    <Warning>
+      Never commit your `.env` file to version control. Always use `.env.example` as a template.
+    </Warning>
+  </Step>
+
+  <Step title="Verify configuration">
+    The Google provider is already configured in `config/ally.ts`:
+
+    ```typescript config/ally.ts
+    import env from '#start/env'
+    import { defineConfig, services } from '@adonisjs/ally'
+
+    const allyConfig = defineConfig({
+      google: services.google({
+        clientId: env.get('GOOGLE_CLIENT_ID'),
+        clientSecret: env.get('GOOGLE_CLIENT_SECRET'),
+        callbackUrl: env.get('VITE_API_URL') + '/google/callback',
+      }),
+    })
+
+    export default allyConfig
+    ```
+  </Step>
+
+  <Step title="Test the integration">
+    1. Start your development server:
+       ```bash
+       pnpm run dev
+       ```
+    
+    2. Navigate to the sign-up page
+    3. Click the "Sign in with Google" button
+    4. Complete the OAuth flow
+    5. Verify that you're logged in
+  </Step>
+</Steps>
+
+## How Social Authentication Works
+
+The social authentication is handled by the `SocialController`:
+
+```typescript app/auth/controllers/social_controller.ts
+import type { HttpContext } from '@adonisjs/core/http'
+import { afterAuthRedirectRoute } from '#config/auth'
+import User from '#users/models/user'
+
+export default class SocialController {
+  // Redirect to OAuth provider
+  async redirect({ ally, params }: HttpContext) {
+    const driverInstance = ally.use(params.provider)
+    return driverInstance.redirect()
+  }
+
+  // Handle OAuth callback
+  async callback({ ally, auth, params, response, session }: HttpContext) {
+    const social = ally.use(params.provider)
+
+    // Handle access denied
+    if (social.accessDenied()) {
+      session.flash('errors', 'auth.social.error.access_denied')
+      return response.redirect().toRoute('auth.sign_up.show')
+    }
+
+    // Handle state mismatch (CSRF protection)
+    if (social.stateMisMatch()) {
+      session.flash('errors', 'auth.social.error.state_mismatch')
+      return response.redirect().toRoute('auth.sign_up.show')
+    }
+
+    // Handle other errors
+    if (social.hasError()) {
+      session.flash('errors', 'auth.social.error.uknown')
+      return response.redirect().toRoute('auth.sign_up.show')
+    }
+
+    // Get user info from provider
+    const socialUser = await social.user()
+
+    // Find or create user
+    let user = await User.findBy('email', socialUser.email)
+
+    if (!user) {
+      user = await User.create({
+        fullName: socialUser.name,
+        email: socialUser.email,
+        password: null,
+        avatarUrl: socialUser.avatarUrl,
+      })
+    }
+
+    // Log in the user
+    await auth.use('web').login(user)
+
+    return response.redirect().toRoute(afterAuthRedirectRoute)
+  }
+}
+```
+
+## Routes Configuration
+
+Social authentication routes are defined in `app/auth/routes.ts`:
+
+```typescript app/auth/routes.ts
+import router from '@adonisjs/core/services/router'
+
+const SocialController = () => import('#auth/controllers/social_controller')
+
+router
+  .get('/:provider/redirect', [SocialController, 'redirect'])
+  .where('provider', /google/)
+  .as('social.create')
+
+router
+  .get('/:provider/callback', [SocialController, 'callback'])
+  .where('provider', /google/)
+```
+
+## Adding More Providers
+
+<Steps>
+  <Step title="Install provider support (if needed)">
+    AdonisJS Ally supports many providers out of the box:
+    - Google
+    - GitHub
+    - Twitter
+    - Facebook
+    - Discord
+    - LinkedIn
+    - And more...
+  </Step>
+
+  <Step title="Add provider configuration">
+    Update `config/ally.ts` to include the new provider:
+
+    ```typescript config/ally.ts
+    const allyConfig = defineConfig({
+      google: services.google({
+        clientId: env.get('GOOGLE_CLIENT_ID'),
+        clientSecret: env.get('GOOGLE_CLIENT_SECRET'),
+        callbackUrl: env.get('VITE_API_URL') + '/google/callback',
+      }),
+      
+      github: services.github({
+        clientId: env.get('GITHUB_CLIENT_ID'),
+        clientSecret: env.get('GITHUB_CLIENT_SECRET'),
+        callbackUrl: env.get('VITE_API_URL') + '/github/callback',
+      }),
+    })
+    ```
+  </Step>
+
+  <Step title="Update routes">
+    Modify the route regex to include the new provider:
+
+    ```typescript
+    router
+      .get('/:provider/redirect', [SocialController, 'redirect'])
+      .where('provider', /google|github/)
+      .as('social.create')
+
+    router
+      .get('/:provider/callback', [SocialController, 'callback'])
+      .where('provider', /google|github/)
+    ```
+  </Step>
+
+  <Step title="Add environment variables">
+    ```bash .env
+    GITHUB_CLIENT_ID=your_github_client_id
+    GITHUB_CLIENT_SECRET=your_github_client_secret
+    ```
+  </Step>
+</Steps>
+
+## Security Considerations
+
+<Card title="CSRF Protection" icon="shield">
+  The Ally package includes built-in CSRF protection through state verification. Never disable this in production.
+</Card>
+
+<Card title="Email Verification" icon="envelope">
+  Social providers verify email addresses, so users authenticated via OAuth can be considered verified.
+</Card>
+
+<Card title="Profile Updates" icon="user">
+  Consider syncing user profile data (name, avatar) on each login to keep it up to date.
+</Card>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Redirect URI mismatch error">
+    Ensure the callback URL in your OAuth provider settings exactly matches the one in your config:
+    
+    ```
+    http://localhost:3333/google/callback  ✓
+    http://localhost:3333/google/callback/ ✗ (trailing slash)
+    ```
+  </Accordion>
+
+  <Accordion title="State mismatch error">
+    This usually happens when:
+    - Session cookies are not being saved
+    - You're testing across different domains (localhost vs 127.0.0.1)
+    - Session expires between redirect and callback
+    
+    Check your session configuration in `config/session.ts`.
+  </Accordion>
+
+  <Accordion title="Access denied error">
+    The user clicked "Cancel" or "Deny" on the OAuth consent screen. This is normal behavior and should be handled gracefully with a helpful error message.
+  </Accordion>
+
+  <Accordion title="Invalid client error">
+    Verify that:
+    - Client ID and Secret are correct
+    - OAuth app is enabled in provider settings
+    - Environment variables are loaded correctly
+  </Accordion>
+</AccordionGroup>
+
+## Environment Variables Reference
+
+```bash .env.example
+# Google OAuth
+GOOGLE_CLIENT_ID=<your-key>
+GOOGLE_CLIENT_SECRET=<your-key>
+
+# Application URL (used for callbacks)
+VITE_API_URL=http://localhost:3333
+```
+
+## Resources
+
+<CardGroup cols={2}>
+  <Card title="AdonisJS Ally Docs" icon="book" href="https://docs.adonisjs.com/guides/authentication/social-authentication">
+    Official social authentication guide
+  </Card>
+  
+  <Card title="Google OAuth Setup" icon="google" href="https://console.cloud.google.com/">
+    Google Cloud Console
+  </Card>
+  
+  <Card title="GitHub OAuth Apps" icon="github" href="https://github.com/settings/developers">
+    Create GitHub OAuth apps
+  </Card>
+  
+  <Card title="Supported Providers" icon="plug" href="https://docs.adonisjs.com/guides/authentication/social-authentication#available-drivers">
+    View all supported providers
+  </Card>
+</CardGroup>

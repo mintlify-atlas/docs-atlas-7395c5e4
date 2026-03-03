@@ -1,0 +1,650 @@
+---
+title: Modular Architecture
+description: Understanding feature-based modules with @adonisjs-community/modules
+---
+
+The AdonisJS Starter Kit uses a **modular architecture** powered by `@adonisjs-community/modules` to organize code into feature-based subdirectories. This makes the codebase more maintainable, scalable, and easier to navigate.
+
+## What Are Modules?
+
+Modules are self-contained feature directories within your AdonisJS application. Instead of organizing code by type (all controllers in one folder, all models in another), modules group related code together:
+
+<CodeGroup>
+```bash Traditional Structure
+app/
+├── controllers/
+│   ├── users_controller.ts
+│   ├── profile_controller.ts
+│   ├── auth_controller.ts
+│   └── posts_controller.ts
+├── models/
+│   ├── user.ts
+│   └── post.ts
+└── validators/
+    ├── user_validator.ts
+    └── auth_validator.ts
+```
+
+```bash Modular Structure
+app/
+├── users/
+│   ├── controllers/
+│   │   ├── users_controller.ts
+│   │   └── profile_controller.ts
+│   ├── models/
+│   │   └── user.ts
+│   └── validators.ts
+├── auth/
+│   ├── controllers/
+│   │   └── auth_controller.ts
+│   └── validators.ts
+└── posts/
+    ├── controllers/
+    │   └── posts_controller.ts
+    └── models/
+        └── post.ts
+```
+</CodeGroup>
+
+<Info>
+  Modules make it easier to understand what code belongs together. Want to work on user management? Everything you need is in the `users/` module.
+</Info>
+
+## Modules in the Starter Kit
+
+The starter kit comes with several pre-built modules:
+
+```bash apps/web/app/
+app/
+├── auth/              # Authentication & authorization
+│   ├── controllers/   # Login, logout, register, password reset
+│   ├── middleware/    # Auth guards, guest middleware
+│   ├── mails/         # Password reset, verification emails
+│   ├── validators.ts  # Login, register validation schemas
+│   ├── routes.ts      # Auth routes
+│   └── ui/           # Login/register React components
+│
+├── users/             # User management
+│   ├── controllers/   # User CRUD, profile, impersonation
+│   ├── models/        # User model
+│   ├── policies/      # User authorization policies
+│   ├── services/      # User business logic
+│   ├── database/      # Migrations, seeders, factories
+│   ├── dtos/          # Data transfer objects
+│   ├── validators.ts  # User validation schemas
+│   ├── routes.ts      # User routes
+│   └── ui/           # User management React components
+│
+├── core/              # Core functionality
+│   ├── abilities/     # CASL ability definitions
+│   ├── exceptions/    # Custom exception handlers
+│   ├── middleware/    # Core middleware
+│   ├── policies/      # Core policies
+│   └── ui/           # Core UI components (layout, navigation)
+│
+├── common/            # Common utilities
+│   ├── controllers/   # Shared controllers
+│   ├── services/      # Shared services
+│   └── ...           # Other shared code
+│
+├── marketing/         # Marketing pages
+│   ├── controllers/   # Landing, about, contact
+│   ├── routes.ts      # Marketing routes
+│   └── resources/     # Marketing page React components
+│
+└── analytics/         # Analytics & tracking
+    ├── controllers/   # Analytics endpoints
+    └── routes.ts      # Analytics routes
+```
+
+## Module Structure
+
+Each module can contain any of these subdirectories:
+
+<Tabs>
+  <Tab title="controllers/">
+    HTTP controllers that handle requests and return responses.
+    
+    ```typescript users/controllers/users_controller.ts
+    import User from '#users/models/user'
+    
+    export default class UsersController {
+      async index() {
+        return User.all()
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="models/">
+    Database models representing tables.
+    
+    ```typescript users/models/user.ts
+    import { BaseModel, column } from '@adonisjs/lucid/orm'
+    
+    export default class User extends BaseModel {
+      @column({ isPrimary: true })
+      declare id: number
+      
+      @column()
+      declare email: string
+    }
+    ```
+  </Tab>
+  
+  <Tab title="services/">
+    Business logic and reusable operations.
+    
+    ```typescript users/services/user_service.ts
+    import User from '#users/models/user'
+    
+    export class UserService {
+      async createUser(data: any) {
+        return User.create(data)
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="validators.ts">
+    VineJS validation schemas.
+    
+    ```typescript users/validators.ts
+    import vine from '@vinejs/vine'
+    
+    export const createUserValidator = vine.compile(
+      vine.object({
+        email: vine.string().email(),
+        password: vine.string().minLength(8),
+      })
+    )
+    ```
+  </Tab>
+  
+  <Tab title="routes.ts">
+    Module-specific routes.
+    
+    ```typescript users/routes.ts
+    import router from '@adonisjs/core/services/router'
+    
+    router.group(() => {
+      router.get('/users', '#users/controllers/users_controller.index')
+    }).prefix('/api')
+    ```
+  </Tab>
+  
+  <Tab title="ui/">
+    React components for Inertia.js pages.
+    
+    ```tsx users/ui/pages/index.tsx
+    import { usePage } from '@inertiajs/react'
+    
+    export default function UsersIndex() {
+      const { users } = usePage().props
+      return <div>Users: {users.length}</div>
+    }
+    ```
+  </Tab>
+  
+  <Tab title="database/">
+    Migrations, seeders, and factories.
+    
+    ```
+    users/database/
+    ├── migrations/
+    │   └── create_users_table.ts
+    ├── seeders/
+    │   └── user_seeder.ts
+    └── factories/
+        └── user_factory.ts
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  You don't need to create all subdirectories. Only add what your module needs. For example, a simple module might only have `controllers/` and `routes.ts`.
+</Note>
+
+## Import Aliases
+
+Each module gets its own import alias defined in `apps/web/package.json`:
+
+```json package.json
+{
+  "imports": {
+    "#auth/*": "./app/auth/*.js",
+    "#users/*": "./app/users/*.js",
+    "#core/*": "./app/core/*.js",
+    "#common/*": "./app/common/*.js",
+    "#marketing/*": "./app/marketing/*.js",
+    "#analytics/*": "./app/analytics/*.js"
+  }
+}
+```
+
+### Using Import Aliases
+
+```typescript
+// Import from users module
+import User from '#users/models/user'
+import UsersController from '#users/controllers/users_controller'
+import { createUserValidator } from '#users/validators'
+
+// Import from auth module
+import { authenticate } from '#auth/middleware/auth_middleware'
+
+// Import from core module
+import { AppException } from '#core/exceptions/app_exception'
+```
+
+<Tip>
+  Import aliases make imports cleaner and prevent issues with relative paths like `../../models/user`.
+</Tip>
+
+## Module Registration
+
+Modules are registered in `adonisrc.ts` under the `preloads` section:
+
+```typescript adonisrc.ts
+export default defineConfig({
+  preloads: [
+    () => import('#start/kernel'),
+
+    // Marketing module
+    () => import('#marketing/routes'),
+
+    // Auth module
+    () => import('#auth/start/view'),
+    () => import('#auth/start/events'),
+    () => import('#auth/routes'),
+
+    // Users module
+    () => import('#users/start/view'),
+    () => import('#users/start/events'),
+    () => import('#users/routes'),
+
+    // Analytics module
+    () => import('#analytics/routes'),
+  ],
+})
+```
+
+<Warning>
+  Preloads are executed in order. Make sure module dependencies are loaded before modules that depend on them.
+</Warning>
+
+## Creating a New Module
+
+### Install the Package
+
+First, ensure `@adonisjs-community/modules` is installed:
+
+```bash
+node ace add @adonisjs-community/modules
+```
+
+### Generate a Module
+
+Use the `make:module` command to scaffold a new module:
+
+```bash
+node ace make:module blog
+```
+
+This creates:
+
+1. A new directory: `app/blog/`
+2. An import alias in `package.json`: `"#blog/*": "./app/blog/*.js"`
+
+### Generate Module Files
+
+Use the `-m` (or `--module`) flag with standard `make` commands:
+
+<CodeGroup>
+```bash Controller
+node ace make:controller post -m=blog
+# Creates: app/blog/controllers/posts_controller.ts
+```
+
+```bash Model
+node ace make:model post -m=blog
+# Creates: app/blog/models/post.ts
+```
+
+```bash Validator
+node ace make:validator create_post -m=blog
+# Creates: app/blog/validators/create_post_validator.ts
+```
+
+```bash Service
+node ace make:service post -m=blog
+# Creates: app/blog/services/post_service.ts
+```
+
+```bash Middleware
+node ace make:middleware check_subscription -m=blog
+# Creates: app/blog/middleware/check_subscription_middleware.ts
+```
+</CodeGroup>
+
+### Create Module Routes
+
+Create `app/blog/routes.ts`:
+
+```typescript app/blog/routes.ts
+import router from '@adonisjs/core/services/router'
+import { middleware } from '#start/kernel'
+
+router
+  .group(() => {
+    router.get('/posts', '#blog/controllers/posts_controller.index')
+    router.get('/posts/:id', '#blog/controllers/posts_controller.show')
+    router.post('/posts', '#blog/controllers/posts_controller.store')
+    router.put('/posts/:id', '#blog/controllers/posts_controller.update')
+    router.delete('/posts/:id', '#blog/controllers/posts_controller.destroy')
+  })
+  .prefix('/blog')
+  .use(middleware.auth())
+```
+
+### Register the Module
+
+Add the module to `adonisrc.ts`:
+
+```typescript adonisrc.ts
+export default defineConfig({
+  preloads: [
+    // ... existing preloads
+    
+    // Blog module
+    () => import('#blog/routes'),
+  ],
+})
+```
+
+<Info>
+  After registering, restart your dev server for the routes to take effect.
+</Info>
+
+## Real Example: Users Module
+
+Let's look at the actual users module from the starter kit:
+
+### Directory Structure
+
+```bash
+app/users/
+├── controllers/
+│   ├── users_controller.ts       # User CRUD operations
+│   ├── profile_controller.ts     # Profile management
+│   ├── api_tokens_controller.ts  # API token management
+│   └── impersonation_controller.ts  # User impersonation
+│
+├── models/
+│   └── user.ts                   # User model
+│
+├── policies/
+│   └── user_policy.ts            # User authorization
+│
+├── services/
+│   └── user_service.ts           # User business logic
+│
+├── database/
+│   ├── migrations/
+│   │   ├── create_users_table.ts
+│   │   └── create_api_tokens_table.ts
+│   ├── seeders/
+│   │   └── user_seeder.ts
+│   └── factories/
+│       └── user_factory.ts
+│
+├── dtos/
+│   └── user_dto.ts               # User DTOs
+│
+├── mails/
+│   └── welcome_email.ts          # Welcome email
+│
+├── ui/
+│   ├── pages/
+│   │   ├── index.tsx            # Users list page
+│   │   ├── show.tsx             # User detail page
+│   │   └── edit.tsx             # Edit user page
+│   └── components/
+│       ├── user-card.tsx
+│       └── user-form.tsx
+│
+├── start/
+│   ├── view.ts                  # Register view globals
+│   └── events.ts                # Register event listeners
+│
+├── routes.ts                    # Module routes
+└── validators.ts                # Validation schemas
+```
+
+### Import Examples
+
+```typescript
+// From controllers
+import User from '#users/models/user'
+import { createUserValidator } from '#users/validators'
+import { UserService } from '#users/services/user_service'
+
+export default class UsersController {
+  async store({ request, response }: HttpContext) {
+    const data = await request.validateUsing(createUserValidator)
+    const userService = new UserService()
+    const user = await userService.createUser(data)
+    return response.created(user)
+  }
+}
+```
+
+### Routes Configuration
+
+```typescript users/routes.ts
+import router from '@adonisjs/core/services/router'
+import { middleware } from '#start/kernel'
+
+router
+  .group(() => {
+    // User management
+    router.get('/users', '#users/controllers/users_controller.index')
+    router.get('/users/:id', '#users/controllers/users_controller.show')
+    router.post('/users', '#users/controllers/users_controller.store')
+    router.put('/users/:id', '#users/controllers/users_controller.update')
+    router.delete('/users/:id', '#users/controllers/users_controller.destroy')
+
+    // Profile
+    router.get('/profile', '#users/controllers/profile_controller.show')
+    router.put('/profile', '#users/controllers/profile_controller.update')
+
+    // API Tokens
+    router.get('/tokens', '#users/controllers/api_tokens_controller.index')
+    router.post('/tokens', '#users/controllers/api_tokens_controller.store')
+    router.delete('/tokens/:id', '#users/controllers/api_tokens_controller.destroy')
+  })
+  .use(middleware.auth())
+```
+
+## Module Communication
+
+Modules can communicate with each other through:
+
+### 1. Direct Imports
+
+```typescript
+// blog/controllers/posts_controller.ts
+import User from '#users/models/user'
+import { authorize } from '#core/middleware/authorize_middleware'
+
+export default class PostsController {
+  async index() {
+    const users = await User.all()
+    return users
+  }
+}
+```
+
+### 2. Services
+
+```typescript
+// blog/services/post_service.ts
+import { UserService } from '#users/services/user_service'
+
+export class PostService {
+  async createPostForUser(userId: number, data: any) {
+    const userService = new UserService()
+    const user = await userService.findUser(userId)
+    // Create post for user
+  }
+}
+```
+
+### 3. Events
+
+```typescript
+// users/start/events.ts
+import emitter from '@adonisjs/core/services/emitter'
+
+emitter.on('user:created', (user) => {
+  // Handle user created event
+})
+```
+
+```typescript
+// blog/controllers/posts_controller.ts
+import emitter from '@adonisjs/core/services/emitter'
+
+export default class PostsController {
+  async store() {
+    // Create post
+    emitter.emit('user:created', user)
+  }
+}
+```
+
+<Tip>
+  Prefer services and events for cross-module communication to maintain loose coupling.
+</Tip>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Keep Modules Focused">
+    Each module should represent a single feature or domain. Don't create a module that does everything.
+    
+    **Good**: `users/`, `auth/`, `blog/`, `comments/`
+    
+    **Bad**: `app/`, `main/`, `everything/`
+  </Accordion>
+  
+  <Accordion title="Use Common for Shared Code">
+    Code used by multiple modules belongs in `common/`:
+    
+    ```typescript
+    // common/services/email_service.ts
+    export class EmailService {
+      async send(to: string, subject: string, body: string) {
+        // Send email
+      }
+    }
+    ```
+    
+    Used in modules:
+    ```typescript
+    import { EmailService } from '#common/services/email_service'
+    ```
+  </Accordion>
+  
+  <Accordion title="Use Core for Framework Code">
+    Framework-level code (middleware, exceptions, policies) belongs in `core/`:
+    
+    ```typescript
+    // core/middleware/authorize_middleware.ts
+    // core/exceptions/app_exception.ts
+    // core/policies/base_policy.ts
+    ```
+  </Accordion>
+  
+  <Accordion title="Organize UI Components">
+    Keep React components organized within modules:
+    
+    ```
+    users/ui/
+    ├── pages/          # Full pages (Inertia endpoints)
+    ├── components/     # Reusable components
+    └── layouts/        # Module-specific layouts
+    ```
+  </Accordion>
+  
+  <Accordion title="Document Module Dependencies">
+    If your module depends on another, document it:
+    
+    ```typescript
+    // blog/README.md
+    # Blog Module
+    
+    ## Dependencies
+    - `#users` - For post authors
+    - `#core` - For authorization
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Migrating Existing Code
+
+To refactor existing code into modules:
+
+1. **Create the module**
+   ```bash
+   node ace make:module blog
+   ```
+
+2. **Move files**
+   ```bash
+   mv app/controllers/posts_controller.ts app/blog/controllers/
+   mv app/models/post.ts app/blog/models/
+   ```
+
+3. **Update imports**
+   ```typescript
+   // Change from:
+   import Post from '#models/post'
+   
+   // To:
+   import Post from '#blog/models/post'
+   ```
+
+4. **Extract routes**
+   ```typescript
+   // Move blog routes from start/routes.ts
+   // To: app/blog/routes.ts
+   ```
+
+5. **Register module**
+   ```typescript
+   // adonisrc.ts
+   preloads: [
+     () => import('#blog/routes'),
+   ]
+   ```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Creating Controllers" icon="code" href="/reference/controllers">
+    Learn how to create controllers within modules
+  </Card>
+  
+  <Card title="Database Models" icon="database" href="/development/models">
+    Understand how to work with Lucid models in modules
+  </Card>
+  
+  <Card title="Routing" icon="route" href="/development/routes">
+    Configure routes for your modules
+  </Card>
+  
+  <Card title="Validation" icon="shield-check" href="/reference/validators">
+    Set up validation schemas in modules
+  </Card>
+</CardGroup>

@@ -1,0 +1,925 @@
+---
+title: Installation
+description: Comprehensive guide to installing and configuring the AdonisJS Starter Kit
+---
+
+## System Requirements
+
+Before installing the AdonisJS Starter Kit, ensure your system meets these requirements:
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="node">
+    **Version 20 or higher**
+    
+    Check your version:
+    ```bash
+    node --version
+    ```
+  </Card>
+  
+  <Card title="pnpm" icon="box">
+    **Version 10.18.0 or higher**
+    
+    Check your version:
+    ```bash
+    pnpm --version
+    ```
+  </Card>
+  
+  <Card title="Docker" icon="docker">
+    **Docker Desktop or Docker Engine**
+    
+    For database services
+  </Card>
+  
+  <Card title="Git" icon="git-alt">
+    **Latest version**
+    
+    For version control
+  </Card>
+</CardGroup>
+
+## Installing Prerequisites
+
+<Steps>
+  <Step title="Install Node.js">
+    Download and install Node.js from [nodejs.org](https://nodejs.org) or use a version manager:
+
+    <CodeGroup>
+    ```bash nvm
+    # Using nvm (Node Version Manager)
+    nvm install 20
+    nvm use 20
+    ```
+
+    ```bash fnm
+    # Using fnm (Fast Node Manager)
+    fnm install 20
+    fnm use 20
+    ```
+    </CodeGroup>
+
+    Verify installation:
+
+    ```bash
+    node --version  # Should output v20.x.x or higher
+    npm --version   # Should be included with Node.js
+    ```
+  </Step>
+
+  <Step title="Install pnpm">
+    Install pnpm globally using npm:
+
+    ```bash
+    npm install -g pnpm@10.18.0
+    ```
+
+    Or use alternative installation methods:
+
+    <CodeGroup>
+    ```bash npm
+    npm install -g pnpm
+    ```
+
+    ```bash corepack
+    # Enable corepack (included with Node.js 16.13+)
+    corepack enable
+    corepack prepare pnpm@10.18.0 --activate
+    ```
+
+    ```bash curl
+    # Using installation script
+    curl -fsSL https://get.pnpm.io/install.sh | sh -
+    ```
+    </CodeGroup>
+
+    Verify installation:
+
+    ```bash
+    pnpm --version  # Should output 10.18.0 or higher
+    ```
+
+    <Info>
+      The starter kit specifies pnpm as the package manager in `package.json` for optimal monorepo performance.
+    </Info>
+  </Step>
+
+  <Step title="Install Docker">
+    Install Docker Desktop for your operating system:
+
+    <Tabs>
+      <Tab title="macOS">
+        Download from [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/)
+        
+        Or install via Homebrew:
+        ```bash
+        brew install --cask docker
+        ```
+      </Tab>
+      
+      <Tab title="Windows">
+        Download from [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/)
+        
+        Or install via Chocolatey:
+        ```bash
+        choco install docker-desktop
+        ```
+      </Tab>
+      
+      <Tab title="Linux">
+        Install Docker Engine:
+        ```bash
+        # Ubuntu/Debian
+        curl -fsSL https://get.docker.com | sh
+        sudo usermod -aG docker $USER
+        ```
+        
+        Install Docker Compose:
+        ```bash
+        sudo apt-get install docker-compose-plugin
+        ```
+      </Tab>
+    </Tabs>
+
+    Verify installation:
+
+    ```bash
+    docker --version
+    docker compose version
+    ```
+  </Step>
+</Steps>
+
+## Creating a New Project
+
+<Steps>
+  <Step title="Scaffold from Template">
+    Use the AdonisJS CLI to create a new project from the starter kit:
+
+    ```bash
+    pnpm create adonisjs@latest -K="filipebraida/adonisjs-starter-kit"
+    ```
+
+    <Note>
+      The `-K` flag specifies the GitHub repository to use as a template. This clones the starter kit with its complete structure.
+    </Note>
+
+    The CLI will prompt you for:
+
+    - **Project name**: Enter your application name (e.g., `my-app`)
+    - **Package manager**: Select `pnpm` (recommended)
+    - **Additional configuration**: Follow prompts as needed
+
+    Navigate to your project:
+
+    ```bash
+    cd my-app
+    ```
+  </Step>
+
+  <Step title="Understand Project Structure">
+    The starter kit follows a monorepo architecture:
+
+    ```bash
+    my-app/
+    ├── apps/
+    │   └── web/                    # Main AdonisJS application
+    │       ├── app/                # Feature modules
+    │       │   ├── auth/          # Authentication module
+    │       │   ├── users/         # User management module
+    │       │   ├── common/        # Shared utilities
+    │       │   ├── core/          # Core functionality
+    │       │   ├── analytics/     # Analytics module
+    │       │   └── marketing/     # Marketing pages
+    │       ├── config/            # Application configuration
+    │       ├── database/          # (Optional) shared migrations
+    │       ├── resources/         # Frontend resources
+    │       │   ├── js/           # React components
+    │       │   ├── views/        # Edge templates
+    │       │   └── images/       # Static images
+    │       ├── start/            # Preload files
+    │       ├── tests/            # Test suites
+    │       ├── .env.example      # Environment template
+    │       ├── adonisrc.ts       # AdonisJS configuration
+    │       ├── package.json      # App dependencies
+    │       └── vite.config.ts    # Vite configuration
+    ├── packages/
+    │   ├── ui/                    # Shared UI components (ShadCN)
+    │   │   ├── src/
+    │   │   │   ├── components/   # Reusable components
+    │   │   │   └── lib/          # Utility functions
+    │   │   ├── components.json   # ShadCN configuration
+    │   │   └── package.json
+    │   ├── eslint-config/         # Shared ESLint configuration
+    │   └── typescript-config/     # Shared TypeScript configuration
+    ├── .github/                   # CI/CD workflows and configs
+    │   ├── postgres/             # PostgreSQL init scripts
+    │   └── pgadmin/              # PgAdmin server configs
+    ├── docker-compose.yaml        # Development services
+    ├── docker-compose.prod.yaml   # Production overrides
+    ├── pnpm-workspace.yaml        # Workspace definition
+    ├── turbo.json                 # TurboRepo configuration
+    ├── package.json               # Root package configuration
+    └── tsconfig.json              # Root TypeScript config
+    ```
+
+    <Info>
+      Each module under `apps/web/app/` can have its own controllers, models, services, validators, database migrations, and routes.
+    </Info>
+  </Step>
+</Steps>
+
+## Environment Configuration
+
+<Steps>
+  <Step title="Create Environment File">
+    Copy the example environment file:
+
+    ```bash
+    cp apps/web/.env.example apps/web/.env
+    ```
+
+    The `.env.example` file includes all necessary configuration options with sensible defaults for development.
+  </Step>
+
+  <Step title="Generate Application Key">
+    Generate a cryptographically secure key for session encryption and other security features:
+
+    ```bash
+    node apps/web/ace generate:key
+    ```
+
+    <Warning>
+      The `APP_KEY` is critical for security. Never commit your `.env` file or share this key publicly.
+    </Warning>
+
+    This command generates a secure key and automatically updates the `APP_KEY` variable in your `.env` file.
+  </Step>
+
+  <Step title="Configure Core Settings">
+    Review and adjust core application settings in `apps/web/.env`:
+
+    <CodeGroup>
+    ```bash Application
+    # Application Settings
+    TZ=UTC                      # Timezone for date/time operations
+    PORT=3333                   # HTTP server port
+    HOST=localhost              # Server hostname
+    LOG_LEVEL=info              # Logging level: trace|debug|info|warn|error|fatal
+    APP_KEY=                    # Generated by ace generate:key
+    NODE_ENV=development        # Environment: development|production|test
+    ```
+
+    ```bash Session & Storage
+    # Session Configuration
+    SESSION_DRIVER=cookie       # Session driver: cookie|memory|redis
+    
+    # File Storage
+    DRIVE_DISK=fs              # Storage driver: fs|s3
+    ```
+
+    ```bash Frontend
+    # Frontend Configuration
+    VITE_API_URL=http://localhost:3333  # API base URL for frontend
+    ```
+    </CodeGroup>
+
+    <Tip>
+      The `VITE_API_URL` variable is used by the React frontend to make API requests. Update this if you change the `PORT`.
+    </Tip>
+  </Step>
+
+  <Step title="Configure Database">
+    The starter kit uses PostgreSQL. Configure your database connection:
+
+    ```bash .env
+    # Database Configuration
+    DB_HOST=127.0.0.1
+    DB_PORT=5432
+    DB_USER=root
+    DB_PASSWORD=root
+    DB_DATABASE=app
+    ```
+
+    <Info>
+      These defaults match the Docker Compose configuration provided in the starter kit.
+    </Info>
+
+    For production, use strong credentials and consider using connection pooling:
+
+    ```bash .env (Production)
+    DB_HOST=your-db-host.com
+    DB_PORT=5432
+    DB_USER=your_secure_user
+    DB_PASSWORD=your_strong_password
+    DB_DATABASE=your_app_production
+    ```
+  </Step>
+
+  <Step title="Configure Email (Optional)">
+    For local development, the starter kit uses **Mailpit** for email testing:
+
+    ```bash .env
+    # Email Configuration (Mailpit for local development)
+    SMTP_HOST=localhost
+    SMTP_PORT=1025
+    SMTP_USERNAME=user@host.com
+    SMTP_PASSWORD=XXX
+    SMTP_SECURE=0
+    SMTP_REJECTUNAUTHORIZED=false
+    
+    # Email From Address
+    EMAIL_FROM=admin@repo.com
+    ```
+
+    <Note>
+      Mailpit captures all outgoing emails during development. Access the interface at `http://localhost:8025` after starting Docker services.
+    </Note>
+
+    For production, configure a real email service like Resend:
+
+    <CodeGroup>
+    ```bash Resend
+    RESEND_API_KEY=re_your_api_key
+    EMAIL_FROM=noreply@yourdomain.com
+    ```
+
+    ```bash SMTP (Production)
+    SMTP_HOST=smtp.yourprovider.com
+    SMTP_PORT=587
+    SMTP_USERNAME=your_smtp_user
+    SMTP_PASSWORD=your_smtp_password
+    SMTP_SECURE=1
+    SMTP_REJECTUNAUTHORIZED=true
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Configure Social Authentication (Optional)">
+    The starter kit supports social authentication via `@adonisjs/ally`. Configure providers as needed:
+
+    <CodeGroup>
+    ```bash Google
+    GOOGLE_CLIENT_ID=your-google-client-id
+    GOOGLE_CLIENT_SECRET=your-google-client-secret
+    ```
+
+    ```bash GitHub
+    GITHUB_CLIENT_ID=your-github-client-id
+    GITHUB_CLIENT_SECRET=your-github-client-secret
+    ```
+    </CodeGroup>
+
+    <Info>
+      To set up OAuth providers:
+      1. Create OAuth applications in Google Cloud Console or GitHub Developer Settings
+      2. Set callback URLs to `http://localhost:3333/auth/[provider]/callback`
+      3. Copy client ID and secret to your `.env` file
+    </Info>
+
+    Leave these blank for now if you don't need social authentication immediately.
+  </Step>
+
+  <Step title="Additional Configuration">
+    Optional settings for advanced features:
+
+    ```bash .env
+    # Rate Limiting
+    LIMITER_STORE=database      # Store: memory|redis|database
+    
+    # CORS (if needed)
+    CORS_ENABLED=true
+    CORS_ORIGIN=*
+    ```
+  </Step>
+</Steps>
+
+## Database Setup
+
+<Steps>
+  <Step title="Start Docker Services">
+    The starter kit includes Docker Compose configuration for all required services:
+
+    ```bash
+    docker compose up -d
+    ```
+
+    This starts three containers:
+
+    <Tabs>
+      <Tab title="PostgreSQL">
+        **Container:** `{PROJECT_NAME}_pgsql`
+        
+        - **Port:** 5432
+        - **Database:** Configured via `DB_DATABASE` in `.env`
+        - **Initialization:** Auto-creates `adonis_app` database via init script
+        
+        ```yaml
+        Database Details:
+        - Host: 127.0.0.1
+        - Port: 5432
+        - User: root
+        - Password: root
+        - Database: app
+        ```
+      </Tab>
+      
+      <Tab title="PgAdmin">
+        **Container:** `{PROJECT_NAME}_pgadmin`
+        
+        - **Port:** 5050
+        - **URL:** http://localhost:5050
+        - **Email:** admin@repo.com
+        - **Password:** secret
+        
+        Pre-configured with server connection to PostgreSQL container.
+      </Tab>
+      
+      <Tab title="Mailpit">
+        **Container:** `{PROJECT_NAME}_mailpit`
+        
+        - **Web UI:** http://localhost:8025
+        - **SMTP:** localhost:1025
+        - **Max Messages:** 5000
+        - **Storage:** `apps/web/tmp/mailpit/`
+        
+        Captures all emails sent by the application.
+      </Tab>
+    </Tabs>
+
+    Verify services are running:
+
+    ```bash
+    docker compose ps
+    ```
+
+    Expected output:
+
+    ```
+    NAME                    STATUS              PORTS
+    repo_pgsql              Up (healthy)        0.0.0.0:5432->5432/tcp
+    repo_pgadmin            Up                  0.0.0.0:5050->80/tcp
+    repo_mailpit            Up                  0.0.0.0:1025->1025/tcp, 0.0.0.0:8025->8025/tcp
+    ```
+
+    <Tip>
+      The PostgreSQL healthcheck ensures the database is ready before proceeding. Wait for the "healthy" status.
+    </Tip>
+  </Step>
+
+  <Step title="Run Migrations">
+    Create database tables by running migrations:
+
+    ```bash
+    pnpm --filter web exec node ace migration:run
+    ```
+
+    <Info>
+      The `--filter web` flag tells pnpm to run the command in the `apps/web` workspace.
+    </Info>
+
+    This executes migrations from the users module:
+
+    - `create_roles_table.ts` - User roles (admin, user, etc.)
+    - `create_users_table.ts` - User accounts
+    - `create_reset_password_tokens_table.ts` - Password recovery
+    - `create_access_tokens_table.ts` - API tokens
+    - `create_rate_limits_table.ts` - Rate limiting
+
+    Verify migrations:
+
+    ```bash
+    pnpm --filter web exec node ace migration:status
+    ```
+
+    <Note>
+      Each feature module can have its own migrations in `app/{module}/database/migrations/`.
+    </Note>
+  </Step>
+
+  <Step title="Seed Database">
+    Populate the database with initial data:
+
+    ```bash
+    pnpm --filter web exec node ace db:seed
+    ```
+
+    The default seeder (`apps/web/app/users/database/seeders/user_seeder.ts`) creates:
+
+    - Default user roles
+    - Admin and test user accounts
+    - Sample data for development
+
+    <Warning>
+      Seeders are for development only. Never run seeders in production with test data.
+    </Warning>
+
+    To create custom seeders:
+
+    ```bash
+    node ace make:seeder product -m=products
+    ```
+  </Step>
+
+  <Step title="Verify Database">
+    Access PgAdmin to verify your database setup:
+
+    1. Open http://localhost:5050
+    2. Login with:
+       - Email: `admin@repo.com`
+       - Password: `secret`
+    3. Expand **Servers** → **PostgreSQL** → **Databases** → **app**
+    4. Check **Schemas** → **public** → **Tables**
+
+    You should see all migrated tables.
+
+    <Tip>
+      Alternatively, use the AdonisJS REPL to query the database:
+      
+      ```bash
+      node ace repl
+      ```
+      
+      Then run:
+      ```javascript
+      await db.from('users').select('*')
+      ```
+    </Tip>
+  </Step>
+</Steps>
+
+## Installing Dependencies
+
+<Steps>
+  <Step title="Install All Dependencies">
+    Install dependencies for all workspaces in the monorepo:
+
+    ```bash
+    pnpm install
+    ```
+
+    <Info>
+      pnpm automatically handles the monorepo structure defined in `pnpm-workspace.yaml`, installing dependencies for:
+      - Root workspace
+      - `apps/web/`
+      - `packages/ui/`
+      - `packages/eslint-config/`
+      - `packages/typescript-config/`
+    </Info>
+
+    This creates:
+    - `node_modules/` in each workspace
+    - `pnpm-lock.yaml` lockfile
+    - Symlinks for workspace dependencies (e.g., `@workspace/ui`)
+  </Step>
+
+  <Step title="Verify Installation">
+    Check that all packages are correctly installed:
+
+    ```bash
+    pnpm list --depth=0
+    ```
+
+    Verify workspace linking:
+
+    ```bash
+    pnpm list --depth=0 --filter web
+    ```
+
+    You should see `@workspace/ui` listed as a dependency.
+  </Step>
+</Steps>
+
+## Building for Production
+
+<Steps>
+  <Step title="Build All Packages">
+    Build all packages in the monorepo:
+
+    ```bash
+    pnpm run build
+    ```
+
+    TurboRepo orchestrates the build process:
+    1. Builds shared packages (`@workspace/ui`, configs)
+    2. Builds the web application
+    3. Compiles TypeScript and bundles frontend assets
+    4. Generates production-ready files in `apps/web/build/`
+
+    <Note>
+      TurboRepo caches build outputs for faster subsequent builds. The cache is stored in `node_modules/.cache/turbo`.
+    </Note>
+  </Step>
+
+  <Step title="Start Production Server">
+    Run the production build:
+
+    ```bash
+    cd apps/web
+    node bin/server.js
+    ```
+
+    Or use the production Docker Compose setup:
+
+    ```bash
+    pnpm run docker:prod
+    ```
+
+    This uses `docker-compose.prod.yaml` with optimized settings.
+  </Step>
+</Steps>
+
+## Development Workflow
+
+<Steps>
+  <Step title="Start Development Server">
+    Launch the development server with hot module reloading:
+
+    ```bash
+    pnpm run dev
+    ```
+
+    This starts:
+    - AdonisJS server with hot reloading (port 3333)
+    - Vite dev server for frontend assets (port 5173)
+    - File watchers for automatic reload on changes
+
+    <Info>
+      The `hot-hook` package enables hot reloading for controllers and middleware without full server restart.
+    </Info>
+
+    Open http://localhost:3333 to view your application.
+  </Step>
+
+  <Step title="Run Linting">
+    Check code quality across all workspaces:
+
+    ```bash
+    pnpm run lint
+    ```
+
+    Fix linting errors automatically:
+
+    ```bash
+    pnpm --filter web run lint --fix
+    ```
+  </Step>
+
+  <Step title="Format Code">
+    Format code using Prettier:
+
+    ```bash
+    pnpm run format
+    ```
+
+    This formats all TypeScript, TSX, and Markdown files.
+  </Step>
+
+  <Step title="Run Tests">
+    Execute the test suite:
+
+    ```bash
+    pnpm --filter web run test
+    ```
+
+    Run specific test suites:
+
+    <CodeGroup>
+    ```bash Unit Tests
+    pnpm --filter web exec node ace test --suite=unit
+    ```
+
+    ```bash Functional Tests
+    pnpm --filter web exec node ace test --suite=functional
+    ```
+    </CodeGroup>
+
+    <Note>
+      Tests are configured in `adonisrc.ts` and use Japa test runner.
+    </Note>
+  </Step>
+</Steps>
+
+## Adding UI Components
+
+The starter kit uses ShadCN for UI components. Add components to your project:
+
+```bash
+pnpm dlx shadcn@latest add [component-name] -c apps/web
+```
+
+<CodeGroup>
+```bash Add Button
+pnpm dlx shadcn@latest add button -c apps/web
+```
+
+```bash Add Dialog
+pnpm dlx shadcn@latest add dialog -c apps/web
+```
+
+```bash Add Form Components
+pnpm dlx shadcn@latest add form input label -c apps/web
+```
+</CodeGroup>
+
+<Info>
+  Components are installed to `packages/ui/src/components/ui/` and can be used across the entire application.
+</Info>
+
+## Creating Feature Modules
+
+The starter kit supports modular architecture using `@adonisjs-community/modules`:
+
+<Steps>
+  <Step title="Install Modules Package (if not already installed)">
+    ```bash
+    node ace add @adonisjs-community/modules
+    ```
+  </Step>
+
+  <Step title="Create a Module">
+    Generate a new feature module:
+
+    ```bash
+    node ace make:module products
+    ```
+
+    This creates:
+    ```bash
+    apps/web/app/products/
+    ├── controllers/
+    ├── models/
+    ├── services/
+    ├── validators/
+    ├── database/
+    │   ├── migrations/
+    │   └── seeders/
+    └── routes.ts
+    ```
+
+    And adds an import alias to `package.json`:
+    ```json
+    {
+      "imports": {
+        "#products/*": "./app/products/*.js"
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Generate Module Resources">
+    Create resources within a module using the `--module` flag:
+
+    <CodeGroup>
+    ```bash Controller
+    node ace make:controller product -m=products
+    ```
+
+    ```bash Model
+    node ace make:model product -m=products
+    ```
+
+    ```bash Validator
+    node ace make:validator create_product -m=products
+    ```
+
+    ```bash Migration
+    node ace make:migration products -m=products
+    ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Docker services won't start">
+    **Port conflicts:**
+    
+    Check if ports are already in use:
+    ```bash
+    lsof -i :5432  # PostgreSQL
+    lsof -i :5050  # PgAdmin
+    lsof -i :8025  # Mailpit
+    ```
+    
+    Stop conflicting services or change ports in `docker-compose.yaml`.
+    
+    **Docker daemon not running:**
+    
+    Start Docker Desktop or the Docker daemon:
+    ```bash
+    # Linux
+    sudo systemctl start docker
+    ```
+  </Accordion>
+  
+  <Accordion title="Migration errors">
+    **Connection refused:**
+    
+    Ensure PostgreSQL is running and credentials match:
+    ```bash
+    docker compose ps
+    docker compose logs pgsql
+    ```
+    
+    **Migration already exists:**
+    
+    Check migration status:
+    ```bash
+    pnpm --filter web exec node ace migration:status
+    ```
+    
+    Rollback if needed:
+    ```bash
+    pnpm --filter web exec node ace migration:rollback
+    ```
+  </Accordion>
+  
+  <Accordion title="Module resolution errors">
+    **Cannot find module '#users/*':**
+    
+    Ensure imports are defined in `apps/web/package.json`:
+    ```json
+    {
+      "imports": {
+        "#users/*": "./app/users/*.js"
+      }
+    }
+    ```
+    
+    Restart your development server after adding imports.
+    
+    **TypeScript errors:**
+    
+    Update `tsconfig.json` paths if needed:
+    ```json
+    {
+      "compilerOptions": {
+        "paths": {
+          "#users/*": ["./app/users/*"]
+        }
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Build failures">
+    **Turbo cache issues:**
+    
+    Clear TurboRepo cache:
+    ```bash
+    pnpm exec turbo clean
+    rm -rf node_modules/.cache/turbo
+    ```
+    
+    **Dependency issues:**
+    
+    Remove all node_modules and reinstall:
+    ```bash
+    rm -rf node_modules apps/*/node_modules packages/*/node_modules
+    pnpm install
+    ```
+  </Accordion>
+  
+  <Accordion title="Frontend not loading">
+    **Vite connection error:**
+    
+    Ensure `VITE_API_URL` in `.env` matches your server:
+    ```bash
+    VITE_API_URL=http://localhost:3333
+    ```
+    
+    **Assets not found:**
+    
+    Check Vite config and ensure dev server is running:
+    ```bash
+    # Should see both servers starting
+    pnpm run dev
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start Guide" icon="rocket" href="/quickstart">
+    Follow the quick start guide for a streamlined setup
+  </Card>
+  
+  <Card title="AdonisJS Documentation" icon="book" href="https://docs.adonisjs.com">
+    Learn more about AdonisJS framework features
+  </Card>
+  
+  <Card title="ShadCN Components" icon="palette" href="https://ui.shadcn.com">
+    Browse available UI components
+  </Card>
+  
+  <Card title="Inertia.js Guide" icon="layer-group" href="https://inertiajs.com">
+    Understand Inertia.js for building SPAs
+  </Card>
+</CardGroup>
+
+<Tip>
+  Join the AdonisJS community on Discord for support and to connect with other developers.
+</Tip>

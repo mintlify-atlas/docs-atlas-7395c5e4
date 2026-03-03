@@ -1,0 +1,389 @@
+---
+title: Middleware
+description: Complete reference for all HTTP middleware in the AdonisJS Starter Kit
+---
+
+This reference documents all middleware components that process HTTP requests in the application pipeline.
+
+## Authentication Middleware
+
+### AuthMiddleware
+
+Protects routes by requiring user authentication.
+
+**Location:** `apps/web/app/auth/middleware/auth_middleware.ts`
+
+<ParamField path="redirectTo" type="string" default="/login">
+  The URL to redirect to when authentication fails
+</ParamField>
+
+<Accordion title="handle()">
+  Authenticates the user and denies access to unauthenticated requests.
+  
+  ```typescript
+  async handle(
+    ctx: HttpContext,
+    next: NextFn,
+    options: {
+      guards?: (keyof Authenticators)[]
+    } = {}
+  )
+  ```
+  
+  **Parameters:**
+  - `ctx` - HTTP context object
+  - `next` - Next middleware function
+  - `options.guards` - Optional array of authentication guards to use
+  
+  **Features:**
+  - Stores return URL in session when unauthorized
+  - Supports multiple authentication guards
+  - Throws `E_UNAUTHORIZED_ACCESS` on failure
+  
+  **Usage:**
+  ```typescript
+  // In routes file
+  router.get('/dashboard', [DashboardController, 'show'])
+    .use(middleware.auth())
+  
+  // With specific guards
+  router.get('/admin', [AdminController, 'index'])
+    .use(middleware.auth({ guards: ['web'] }))
+  ```
+</Accordion>
+
+**Constants:**
+
+<ParamField path="returnToKey" type="string" value="return_to">
+  Session key used to store the URL to return to after authentication
+</ParamField>
+
+---
+
+### GuestMiddleware
+
+Denies access to routes for authenticated users (e.g., login pages).
+
+**Location:** `apps/web/app/auth/middleware/guest_middleware.ts`
+
+<Accordion title="handle()">
+  Redirects authenticated users away from guest-only pages.
+  
+  ```typescript
+  async handle(
+    ctx: HttpContext,
+    next: NextFn,
+    options: { guards?: (keyof Authenticators)[] } = {}
+  )
+  ```
+  
+  **Parameters:**
+  - `options.guards` - Authentication guards to check (defaults to default guard)
+  
+  **Behavior:**
+  - If user is authenticated, redirects to `afterAuthRedirectRoute`
+  - If user is not authenticated, allows request to proceed
+  
+  **Usage:**
+  ```typescript
+  // Prevent logged-in users from accessing login page
+  router.get('/login', [SignInController, 'show'])
+    .use(middleware.guest())
+  ```
+</Accordion>
+
+---
+
+### SilentAuthMiddleware
+
+Silently checks authentication status without blocking requests.
+
+**Location:** `apps/web/app/auth/middleware/silent_auth_middleware.ts`
+
+<Accordion title="handle()">
+  Checks if user is authenticated without throwing errors.
+  
+  ```typescript
+  async handle(ctx: HttpContext, next: NextFn)
+  ```
+  
+  **Features:**
+  - Does not redirect or throw errors
+  - Populates `ctx.auth.user` if authenticated
+  - Sets `ctx.auth.user` to null if not authenticated
+  - Request continues regardless of authentication status
+  
+  **Use Cases:**
+  - Global middleware for all routes
+  - Optional authentication (user may or may not be logged in)
+  - Checking auth status for conditional UI rendering
+  
+  **Usage:**
+  ```typescript
+  // As global middleware
+  router.use([middleware.silentAuth()])
+  ```
+</Accordion>
+
+---
+
+## Localization Middleware
+
+### DetectUserLocaleMiddleware
+
+Detects and sets the user's preferred language for i18n.
+
+**Location:** `apps/web/app/core/middleware/detect_user_locale_middleware.ts`
+
+<Accordion title="getRequestLocale()">
+  Determines the user's language preference.
+  
+  ```typescript
+  protected getRequestLocale(ctx: HttpContext): string
+  ```
+  
+  **Detection Priority:**
+  1. `X-User-Language` header
+  2. `user-locale` cookie
+  3. `Accept-Language` header
+  4. Default locale from config
+  
+  **Returns:** ISO language code (e.g., 'en', 'fr')
+</Accordion>
+
+<Accordion title="handle()">
+  Sets up i18n for the request.
+  
+  ```typescript
+  async handle(ctx: HttpContext, next: NextFn)
+  ```
+  
+  **Features:**
+  - Creates request-specific i18n instance
+  - Sets/updates `user-locale` cookie (30-day expiration)
+  - Configures validation message provider
+  - Binds i18n to IoC container
+  - Shares i18n with Edge templates
+  
+  **Cookie Options:**
+  - HttpOnly: true (prevents JavaScript access)
+  - Path: `/` (available site-wide)
+  - Max Age: 30 days
+  - SameSite: true (CSRF protection)
+  
+  **Usage:**
+  ```typescript
+  // Access in controller
+  async handle({ i18n }: HttpContext) {
+    const message = i18n.t('welcome.message')
+  }
+  ```
+</Accordion>
+
+**Static Configuration:**
+
+<Accordion title="messagesProvider">
+  Configures i18n for validation messages.
+  
+  ```typescript
+  static {
+    RequestValidator.messagesProvider = (ctx) => {
+      return ctx.i18n.createMessagesProvider()
+    }
+  }
+  ```
+  
+  This enables automatic translation of validation error messages.
+</Accordion>
+
+---
+
+### SwitchLocaleMiddleware
+
+Manually switches the user's language preference.
+
+**Location:** `apps/web/app/common/middlewares/switch_locale_middleware.ts`
+
+<Accordion title="handle()">
+  Updates the locale cookie and redirects back.
+  
+  ```typescript
+  async handle(ctx: HttpContext, next: NextFn)
+  ```
+  
+  **Parameters:**
+  - `ctx.params.locale` - New locale code from route parameter
+  
+  **Behavior:**
+  - Sets `user-locale` cookie to new value
+  - Redirects back to previous page
+  - Cookie persists for 30 days
+  
+  **Usage:**
+  ```typescript
+  // In routes
+  router.post('/locale/:locale', [SwitchLocaleMiddleware])
+  
+  // From frontend
+  <form action="/locale/fr" method="POST">
+    <button>Switch to French</button>
+  </form>
+  ```
+</Accordion>
+
+---
+
+## Core Middleware
+
+### ContainerBindingsMiddleware
+
+Binds request-specific values to the IoC container.
+
+**Location:** `apps/web/app/core/middleware/container_bindings_middleware.ts`
+
+<Accordion title="handle()">
+  Registers context and logger in the container.
+  
+  ```typescript
+  handle(ctx: HttpContext, next: NextFn)
+  ```
+  
+  **Bindings:**
+  - `HttpContext` → Current HTTP context
+  - `Logger` → Request-specific logger instance
+  
+  **Usage:**
+  This enables dependency injection of these classes in services:
+  
+  ```typescript
+  import { inject } from '@adonisjs/core/container'
+  import { HttpContext } from '@adonisjs/core/http'
+  import { Logger } from '@adonisjs/core/logger'
+  
+  @inject()
+  export class MyService {
+    constructor(
+      protected ctx: HttpContext,
+      protected logger: Logger
+    ) {}
+  }
+  ```
+</Accordion>
+
+---
+
+### InitializeBouncerMiddleware
+
+Initializes authorization (Bouncer) for the request.
+
+**Location:** `apps/web/app/core/middleware/initialize_bouncer_middleware.ts`
+
+<Accordion title="handle()">
+  Creates a Bouncer instance for authorization checks.
+  
+  ```typescript
+  async handle(ctx: HttpContext, next: NextFn)
+  ```
+  
+  **Features:**
+  - Creates Bouncer instance with current user
+  - Loads all policies and abilities
+  - Sets container resolver for dependency injection
+  - Shares Bouncer helpers with Edge templates
+  
+  **Configuration:**
+  ```typescript
+  ctx.bouncer = new Bouncer(
+    () => ctx.auth.user || null,
+    abilities,
+    policies
+  ).setContainerResolver(ctx.containerResolver)
+  ```
+  
+  **Usage in Controllers:**
+  ```typescript
+  async index({ bouncer }: HttpContext) {
+    await bouncer.with(UserPolicy).authorize('viewList')
+    // ... rest of controller logic
+  }
+  ```
+  
+  **Usage in Templates:**
+  ```edge
+  @can('create', 'User')
+    <a href="/users/create">Create User</a>
+  @end
+  ```
+</Accordion>
+
+**Type Extension:**
+
+Adds `bouncer` property to HttpContext:
+
+```typescript
+declare module '@adonisjs/core/http' {
+  export interface HttpContext {
+    bouncer: Bouncer<
+      Exclude<HttpContext['auth']['user'], undefined>,
+      typeof abilities,
+      typeof policies
+    >
+  }
+}
+```
+
+---
+
+## Middleware Stack
+
+<Tabs>
+  <Tab title="Global Middleware">
+    Applied to all requests:
+    
+    ```typescript
+    // In start/kernel.ts
+    Server.middleware.register([
+      () => import('#core/middleware/container_bindings_middleware'),
+      () => import('#core/middleware/detect_user_locale_middleware'),
+      () => import('#auth/middleware/silent_auth_middleware'),
+      () => import('#core/middleware/initialize_bouncer_middleware'),
+    ])
+    ```
+  </Tab>
+  
+  <Tab title="Named Middleware">
+    Applied to specific routes:
+    
+    ```typescript
+    // In start/kernel.ts
+    Server.middleware.named({
+      auth: () => import('#auth/middleware/auth_middleware'),
+      guest: () => import('#auth/middleware/guest_middleware'),
+    })
+    
+    // Usage in routes
+    router.get('/dashboard', handler).use(middleware.auth())
+    router.get('/login', handler).use(middleware.guest())
+    ```
+  </Tab>
+  
+  <Tab title="Order of Execution">
+    Middleware executes in this order:
+    
+    1. **ContainerBindingsMiddleware** - IoC container setup
+    2. **DetectUserLocaleMiddleware** - i18n configuration
+    3. **SilentAuthMiddleware** - Check authentication status
+    4. **InitializeBouncerMiddleware** - Authorization setup
+    5. **AuthMiddleware** _(if applied)_ - Require authentication
+    6. **GuestMiddleware** _(if applied)_ - Block authenticated users
+    7. **Route Handler** - Your controller method
+  </Tab>
+  
+  <Tab title="Best Practices">
+    - Use `auth` middleware for protected routes requiring login
+    - Use `guest` middleware for login/register pages
+    - Use `silentAuth` globally to make user available everywhere
+    - Always initialize bouncer before checking permissions
+    - Place locale detection early for proper i18n support
+  </Tab>
+</Tabs>

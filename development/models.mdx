@@ -1,0 +1,670 @@
+---
+title: Models
+description: Work with Lucid ORM models and relationships in the AdonisJS Starter Kit
+---
+
+The AdonisJS Starter Kit uses **Lucid ORM** for database interactions. Models provide an object-oriented way to work with your database tables.
+
+## Model Organization
+
+Models are organized by feature:
+
+```
+apps/web/app/
+├── users/
+│   ├── models/
+│   │   ├── user.ts
+│   │   ├── role.ts
+│   │   └── reset_password_token.ts
+│   ├── database/
+│   │   ├── migrations/
+│   │   ├── seeders/
+│   │   └── factories/
+│   └── controllers/
+└── common/
+    └── models/
+        └── base_model.ts
+```
+
+<Note>
+  All feature-specific models extend `BaseModel` from `#common/models/base_model`.
+</Note>
+
+## Base Model
+
+The starter kit provides a base model with common functionality:
+
+```typescript app/common/models/base_model.ts
+import { BaseModel as LucidBaseModel } from '@adonisjs/lucid/orm'
+import { DateTime } from 'luxon'
+import { column } from '@adonisjs/lucid/orm'
+
+export default class BaseModel extends LucidBaseModel {
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime
+}
+```
+
+## Creating Models
+
+Generate a new model:
+
+```bash
+node ace make:model Post
+```
+
+This creates a model file:
+
+```typescript app/posts/models/post.ts
+import { column } from '@adonisjs/lucid/orm'
+import BaseModel from '#common/models/base_model'
+
+export default class Post extends BaseModel {
+  @column({ isPrimary: true })
+  declare id: number
+
+  @column()
+  declare title: string
+
+  @column()
+  declare content: string
+}
+```
+
+## User Model
+
+Here's the actual User model from the starter kit:
+
+```typescript app/users/models/user.ts
+import hash from '@adonisjs/core/services/hash'
+import { compose } from '@adonisjs/core/helpers'
+import { belongsTo, column, computed, hasMany } from '@adonisjs/lucid/orm'
+import { withAuthFinder } from '@adonisjs/auth/mixins/lucid'
+import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
+import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
+
+import { attachment, attachmentManager } from '@jrmc/adonis-attachment'
+import type { Attachment } from '@jrmc/adonis-attachment/types/attachment'
+
+import BaseModel from '#common/models/base_model'
+import Role from '#users/models/role'
+import Roles from '#users/enums/role'
+import ResetPasswordToken from '#users/models/reset_password_token'
+
+const AuthFinder = withAuthFinder(() => hash.use('scrypt'), {
+  uids: ['email'],
+  passwordColumnName: 'password',
+})
+
+export default class User extends compose(BaseModel, AuthFinder) {
+  @column({ isPrimary: true })
+  declare id: number
+
+  @column()
+  declare roleId: number
+
+  @column()
+  declare fullName: string | null
+
+  @column()
+  declare email: string
+
+  @column({ serializeAs: null })
+  declare password: string | null
+
+  @attachment({ preComputeUrl: false, variants: ['thumbnail'] })
+  declare avatar: Attachment
+
+  @column()
+  declare avatarUrl: string | null
+
+  @belongsTo(() => Role)
+  declare role: BelongsTo<typeof Role>
+
+  @hasMany(() => ResetPasswordToken)
+  declare resetPasswordTokens: HasMany<typeof ResetPasswordToken>
+
+  @computed()
+  get isAdmin() {
+    return this.roleId === Roles.ADMIN
+  }
+
+  static async preComputeUrls(models: User | User[]) {
+    if (Array.isArray(models)) {
+      await Promise.all(models.map((model) => this.preComputeUrls(model)))
+      return
+    }
+
+    if (!models.avatar) {
+      return
+    }
+
+    const thumbnail = models.avatar.getVariant('thumbnail')
+
+    if (thumbnail) {
+      await attachmentManager.computeUrl(thumbnail)
+    }
+  }
+
+  static accessTokens = DbAccessTokensProvider.forModel(User)
+}
+```
+
+<Tip>
+  The `withAuthFinder` mixin adds authentication capabilities to the model, including password hashing and verification.
+</Tip>
+
+## Role Model
+
+Here's the Role model with a one-to-many relationship:
+
+```typescript app/users/models/role.ts
+import { DateTime } from 'luxon'
+import { column, hasMany } from '@adonisjs/lucid/orm'
+import type { HasMany } from '@adonisjs/lucid/types/relations'
+
+import User from '#users/models/user'
+import BaseModel from '#common/models/base_model'
+
+export default class Role extends BaseModel {
+  @column({ isPrimary: true })
+  declare id: number
+
+  @column()
+  declare name: string
+
+  @column()
+  declare description: string
+
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime
+
+  @hasMany(() => User)
+  declare users: HasMany<typeof User>
+}
+```
+
+## Columns
+
+### Column Decorators
+
+<CodeGroup>
+```typescript Basic column
+@column()
+declare title: string
+```
+
+```typescript Primary key
+@column({ isPrimary: true })
+declare id: number
+```
+
+```typescript Column name mapping
+@column({ columnName: 'full_name' })
+declare fullName: string
+```
+
+```typescript Hide from serialization
+@column({ serializeAs: null })
+declare password: string
+```
+
+```typescript Custom serialization
+@column({ 
+  serialize: (value) => value?.toUpperCase() 
+})
+declare name: string
+```
+</CodeGroup>
+
+### Date Columns
+
+```typescript
+import { DateTime } from 'luxon'
+
+@column.dateTime({ autoCreate: true })
+declare createdAt: DateTime
+
+@column.dateTime({ autoCreate: true, autoUpdate: true })
+declare updatedAt: DateTime
+
+@column.date()
+declare publishedOn: DateTime
+```
+
+## Relationships
+
+### BelongsTo (Many-to-One)
+
+A user belongs to a role:
+
+```typescript
+import { belongsTo } from '@adonisjs/lucid/orm'
+import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import Role from './role'
+
+export default class User extends BaseModel {
+  @column()
+  declare roleId: number
+
+  @belongsTo(() => Role)
+  declare role: BelongsTo<typeof Role>
+}
+```
+
+Usage:
+
+```typescript
+const user = await User.find(1)
+await user.load('role')
+console.log(user.role.name)
+
+// Or with query
+const user = await User.query()
+  .where('id', 1)
+  .preload('role')
+  .firstOrFail()
+```
+
+### HasMany (One-to-Many)
+
+A role has many users:
+
+```typescript
+import { hasMany } from '@adonisjs/lucid/orm'
+import type { HasMany } from '@adonisjs/lucid/types/relations'
+import User from './user'
+
+export default class Role extends BaseModel {
+  @hasMany(() => User)
+  declare users: HasMany<typeof User>
+}
+```
+
+Usage:
+
+```typescript
+const role = await Role.find(1)
+await role.load('users')
+console.log(role.users.length)
+
+// Create related record
+await role.related('users').create({
+  email: 'user@example.com',
+  fullName: 'John Doe',
+})
+```
+
+### ManyToMany
+
+```typescript
+import { manyToMany } from '@adonisjs/lucid/orm'
+import type { ManyToMany } from '@adonisjs/lucid/types/relations'
+import Tag from './tag'
+
+export default class Post extends BaseModel {
+  @manyToMany(() => Tag)
+  declare tags: ManyToMany<typeof Tag>
+}
+```
+
+Usage:
+
+```typescript
+const post = await Post.find(1)
+
+// Attach tags
+await post.related('tags').attach([1, 2, 3])
+
+// Detach tags
+await post.related('tags').detach([2])
+
+// Sync tags (detach all and attach new ones)
+await post.related('tags').sync([1, 3, 4])
+
+// Load tags
+await post.load('tags')
+console.log(post.tags)
+```
+
+### HasOne
+
+```typescript
+import { hasOne } from '@adonisjs/lucid/orm'
+import type { HasOne } from '@adonisjs/lucid/types/relations'
+import Profile from './profile'
+
+export default class User extends BaseModel {
+  @hasOne(() => Profile)
+  declare profile: HasOne<typeof Profile>
+}
+```
+
+## Computed Properties
+
+Computed properties are derived values:
+
+```typescript
+export default class User extends BaseModel {
+  @column()
+  declare roleId: number
+
+  @computed()
+  get isAdmin() {
+    return this.roleId === Roles.ADMIN
+  }
+
+  @computed()
+  get initials() {
+    return this.fullName
+      ?.split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase() || ''
+  }
+}
+```
+
+Usage:
+
+```typescript
+const user = await User.find(1)
+console.log(user.isAdmin) // true/false
+console.log(user.initials) // 'JD'
+```
+
+## Querying
+
+### Basic Queries
+
+<CodeGroup>
+```typescript Find all
+const users = await User.all()
+```
+
+```typescript Find by ID
+const user = await User.find(1)
+const user = await User.findOrFail(1) // Throws if not found
+```
+
+```typescript Find by column
+const user = await User.findBy('email', 'user@example.com')
+const user = await User.findByOrFail('email', 'user@example.com')
+```
+
+```typescript First result
+const user = await User.first()
+const user = await User.firstOrFail()
+```
+</CodeGroup>
+
+### Query Builder
+
+```typescript
+// Where clauses
+const admins = await User.query()
+  .where('role_id', Roles.ADMIN)
+  .exec()
+
+// Multiple conditions
+const users = await User.query()
+  .where('role_id', Roles.USER)
+  .where('created_at', '>', DateTime.now().minus({ days: 7 }))
+  .exec()
+
+// Or conditions
+const users = await User.query()
+  .where('role_id', Roles.ADMIN)
+  .orWhere('role_id', Roles.MODERATOR)
+  .exec()
+
+// Ordering
+const users = await User.query()
+  .orderBy('created_at', 'desc')
+  .exec()
+
+// Pagination
+const users = await User.query()
+  .paginate(page, perPage)
+
+// Limiting
+const users = await User.query()
+  .limit(10)
+  .exec()
+```
+
+### Eager Loading
+
+```typescript
+// Load single relationship
+const users = await User.query()
+  .preload('role')
+  .exec()
+
+// Load multiple relationships
+const users = await User.query()
+  .preload('role')
+  .preload('resetPasswordTokens')
+  .exec()
+
+// Nested preloading
+const posts = await Post.query()
+  .preload('author', (query) => {
+    query.preload('role')
+  })
+  .exec()
+
+// Conditional preloading
+const users = await User.query()
+  .preload('role', (query) => {
+    query.where('name', 'Admin')
+  })
+  .exec()
+```
+
+## Creating Records
+
+<CodeGroup>
+```typescript Create single
+const user = await User.create({
+  email: 'user@example.com',
+  fullName: 'John Doe',
+  roleId: Roles.USER,
+})
+```
+
+```typescript Create many
+const users = await User.createMany([
+  { email: 'user1@example.com', fullName: 'User 1' },
+  { email: 'user2@example.com', fullName: 'User 2' },
+])
+```
+
+```typescript Update or create
+const user = await User.updateOrCreate(
+  { email: 'user@example.com' }, // Search criteria
+  { fullName: 'John Doe' }        // Values to set
+)
+```
+
+```typescript Update or create many
+await User.updateOrCreateMany('email', [
+  { email: 'user1@example.com', fullName: 'User 1' },
+  { email: 'user2@example.com', fullName: 'User 2' },
+])
+```
+</CodeGroup>
+
+## Updating Records
+
+<CodeGroup>
+```typescript Update instance
+const user = await User.findOrFail(1)
+user.fullName = 'Jane Doe'
+await user.save()
+```
+
+```typescript Merge and save
+const user = await User.findOrFail(1)
+user.merge({ fullName: 'Jane Doe', email: 'jane@example.com' })
+await user.save()
+```
+
+```typescript Update query
+await User.query()
+  .where('role_id', Roles.USER)
+  .update({ roleId: Roles.MODERATOR })
+```
+</CodeGroup>
+
+## Deleting Records
+
+<CodeGroup>
+```typescript Delete instance
+const user = await User.findOrFail(1)
+await user.delete()
+```
+
+```typescript Delete query
+await User.query()
+  .where('created_at', '<', DateTime.now().minus({ years: 1 }))
+  .delete()
+```
+</CodeGroup>
+
+## Hooks
+
+Models support lifecycle hooks:
+
+```typescript
+import { beforeSave, afterCreate } from '@adonisjs/lucid/orm'
+
+export default class User extends BaseModel {
+  @beforeSave()
+  static async hashPassword(user: User) {
+    if (user.$dirty.password) {
+      user.password = await hash.make(user.password)
+    }
+  }
+
+  @afterCreate()
+  static async sendWelcomeEmail(user: User) {
+    await sendEmail(user.email, 'Welcome!')
+  }
+}
+```
+
+Available hooks:
+- `@beforeSave()` - Before create or update
+- `@afterSave()` - After create or update
+- `@beforeCreate()` - Before create
+- `@afterCreate()` - After create
+- `@beforeUpdate()` - Before update
+- `@afterUpdate()` - After update
+- `@beforeDelete()` - Before delete
+- `@afterDelete()` - After delete
+- `@beforeFind()` - Before find query
+- `@afterFind()` - After find query
+- `@beforeFetch()` - Before fetch query
+- `@afterFetch()` - After fetch query
+
+## Serialization
+
+Control how models are serialized to JSON:
+
+```typescript
+const user = await User.findOrFail(1)
+
+// Serialize to object
+const data = user.serialize()
+
+// Serialize to JSON
+const json = user.toJSON()
+
+// Hide fields
+user.serialize({
+  fields: {
+    omit: ['password', 'createdAt']
+  }
+})
+
+// Show only specific fields
+user.serialize({
+  fields: {
+    pick: ['id', 'fullName', 'email']
+  }
+})
+
+// Include relationships
+user.serialize({
+  relations: {
+    role: {
+      fields: ['id', 'name']
+    }
+  }
+})
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use query builder for complex queries">
+    The query builder is more efficient and readable for complex queries:
+    ```typescript
+    // Good
+    const users = await User.query()
+      .where('role_id', Roles.ADMIN)
+      .preload('role')
+      .orderBy('created_at', 'desc')
+      .exec()
+    
+    // Avoid
+    const users = await User.all()
+    const admins = users.filter(u => u.roleId === Roles.ADMIN)
+    ```
+  </Accordion>
+
+  <Accordion title="Always preload relationships">
+    Use eager loading to avoid N+1 queries:
+    ```typescript
+    // Good - 2 queries
+    const users = await User.query().preload('role').exec()
+    
+    // Bad - N+1 queries
+    const users = await User.all()
+    for (const user of users) {
+      await user.load('role')
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Use computed properties for derived values">
+    Don't add methods for simple computed values - use `@computed()` decorator.
+  </Accordion>
+
+  <Accordion title="Hide sensitive data from serialization">
+    Use `serializeAs: null` to prevent sensitive fields from being exposed:
+    ```typescript
+    @column({ serializeAs: null })
+    declare password: string
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Database" icon="database" href="/development/database">
+    Learn about migrations and seeders
+  </Card>
+  
+  <Card title="Routes" icon="route" href="/development/routes">
+    Define routes for your models
+  </Card>
+</CardGroup>

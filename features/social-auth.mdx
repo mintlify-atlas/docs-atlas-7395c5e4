@@ -1,0 +1,357 @@
+---
+title: Social Authentication
+description: OAuth integration with Google and GitHub for seamless social login
+icon: share-nodes
+---
+
+## Overview
+
+The AdonisJS Starter Kit includes pre-configured social authentication using AdonisJS Ally. Users can sign in with their Google or GitHub accounts, with automatic account creation for first-time users.
+
+## Supported Providers
+
+Currently configured:
+- **Google OAuth 2.0**
+- GitHub (can be easily added)
+
+## Social Authentication Flow
+
+The `SocialController` handles the complete OAuth flow:
+
+```typescript app/auth/controllers/social_controller.ts
+import type { HttpContext } from '@adonisjs/core/http'
+import { afterAuthRedirectRoute } from '#config/auth'
+import User from '#users/models/user'
+
+export default class SocialController {
+  // Step 1: Redirect to OAuth provider
+  async redirect({ ally, params }: HttpContext) {
+    const driverInstance = ally.use(params.provider)
+    return driverInstance.redirect()
+  }
+
+  // Step 2: Handle OAuth callback
+  async callback({ ally, auth, params, response, session }: HttpContext) {
+    const social = ally.use(params.provider)
+
+    // User denied access
+    if (social.accessDenied()) {
+      session.flash('errors', 'auth.social.error.access_denied')
+      return response.redirect().toRoute('auth.sign_up.show')
+    }
+
+    // CSRF token mismatch
+    if (social.stateMisMatch()) {
+      session.flash('errors', 'auth.social.error.state_mismatch')
+      return response.redirect().toRoute('auth.sign_up.show')
+    }
+
+    // Provider error
+    if (social.hasError()) {
+      session.flash('errors', 'auth.social.error.uknown')
+      return response.redirect().toRoute('auth.sign_up.show')
+    }
+
+    // Get user info from provider
+    const socialUser = await social.user()
+
+    // Find or create user
+    let user = await User.findBy('email', socialUser.email)
+
+    if (!user) {
+      user = await User.create({
+        fullName: socialUser.name,
+        email: socialUser.email,
+        password: null,
+        avatarUrl: socialUser.avatarUrl,
+      })
+    }
+
+    // Log user in
+    await auth.use('web').login(user)
+
+    return response.redirect().toRoute(afterAuthRedirectRoute)
+  }
+}
+```
+
+<Info>
+**Automatic Account Creation**: If a user signs in with a social provider for the first time, a new account is automatically created using their social profile information.
+</Info>
+
+## Configuration
+
+### Ally Configuration
+
+Configure OAuth providers in `config/ally.ts`:
+
+```typescript config/ally.ts
+import env from '#start/env'
+import { defineConfig, services } from '@adonisjs/ally'
+
+const allyConfig = defineConfig({
+  google: services.google({
+    clientId: env.get('GOOGLE_CLIENT_ID'),
+    clientSecret: env.get('GOOGLE_CLIENT_SECRET'),
+    callbackUrl: env.get('VITE_API_URL') + '/google/callback',
+  }),
+})
+
+export default allyConfig
+
+declare module '@adonisjs/ally/types' {
+  interface SocialProviders extends InferSocialProviders<typeof allyConfig> {}
+}
+```
+
+### Environment Variables
+
+Add OAuth credentials to your `.env` file:
+
+```env
+# Google OAuth
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# GitHub OAuth (if using)
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+
+# Base URL
+VITE_API_URL=http://localhost:3000
+```
+
+## Social Routes
+
+Social authentication routes in `app/auth/routes.ts`:
+
+```typescript app/auth/routes.ts
+import router from '@adonisjs/core/services/router'
+
+const SocialController = () => import('#auth/controllers/social_controller')
+
+// Google OAuth
+router
+  .get('/:provider/redirect', [SocialController, 'redirect'])
+  .where('provider', /google/)
+  .as('social.create')
+
+router
+  .get('/:provider/callback', [SocialController, 'callback'])
+  .where('provider', /google/)
+```
+
+<Note>
+The routes use a dynamic `:provider` parameter with a regex constraint, making it easy to add more providers.
+</Note>
+
+## Adding GitHub Authentication
+
+To add GitHub as a provider:
+
+### Step 1: Update Ally Config
+
+```typescript config/ally.ts
+import { defineConfig, services } from '@adonisjs/ally'
+
+const allyConfig = defineConfig({
+  google: services.google({
+    clientId: env.get('GOOGLE_CLIENT_ID'),
+    clientSecret: env.get('GOOGLE_CLIENT_SECRET'),
+    callbackUrl: env.get('VITE_API_URL') + '/google/callback',
+  }),
+  github: services.github({
+    clientId: env.get('GITHUB_CLIENT_ID'),
+    clientSecret: env.get('GITHUB_CLIENT_SECRET'),
+    callbackUrl: env.get('VITE_API_URL') + '/github/callback',
+  }),
+})
+```
+
+### Step 2: Update Routes
+
+```typescript app/auth/routes.ts
+router
+  .get('/:provider/redirect', [SocialController, 'redirect'])
+  .where('provider', /google|github/)
+  .as('social.create')
+
+router
+  .get('/:provider/callback', [SocialController, 'callback'])
+  .where('provider', /google|github/)
+```
+
+### Step 3: Add Environment Variables
+
+```env
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+```
+
+## Setting Up OAuth Applications
+
+### Google OAuth Setup
+
+<Steps>
+  <Step title="Create Project">
+    Go to [Google Cloud Console](https://console.cloud.google.com/) and create a new project.
+  </Step>
+  <Step title="Enable OAuth">
+    Navigate to "APIs & Services" > "OAuth consent screen" and configure your app.
+  </Step>
+  <Step title="Create Credentials">
+    Go to "Credentials" > "Create Credentials" > "OAuth 2.0 Client ID".
+  </Step>
+  <Step title="Configure Redirect URI">
+    Add your callback URL: `http://localhost:3000/google/callback` (development) and your production URL.
+  </Step>
+  <Step title="Copy Credentials">
+    Copy the Client ID and Client Secret to your `.env` file.
+  </Step>
+</Steps>
+
+### GitHub OAuth Setup
+
+<Steps>
+  <Step title="Register Application">
+    Go to GitHub Settings > Developer settings > OAuth Apps > New OAuth App.
+  </Step>
+  <Step title="Configure App">
+    Set the Homepage URL and Authorization callback URL to your app's URLs.
+  </Step>
+  <Step title="Generate Secret">
+    Create a new client secret and copy both the Client ID and Secret.
+  </Step>
+  <Step title="Update Environment">
+    Add the credentials to your `.env` file.
+  </Step>
+</Steps>
+
+## User Data Handling
+
+### Social User Information
+
+Data received from OAuth providers:
+
+```typescript
+const socialUser = await social.user()
+
+// Available fields:
+{
+  id: string,           // Provider's user ID
+  name: string,         // Full name
+  email: string,        // Email address
+  avatarUrl: string,    // Profile picture URL
+  emailVerified: boolean, // Email verification status
+  original: object      // Raw response from provider
+}
+```
+
+### User Model Fields
+
+The User model supports social authentication:
+
+```typescript app/users/models/user.ts
+export default class User extends compose(BaseModel, AuthFinder) {
+  @column()
+  declare fullName: string | null
+
+  @column()
+  declare email: string
+
+  @column({ serializeAs: null })
+  declare password: string | null  // Null for social auth users
+
+  @column()
+  declare avatarUrl: string | null  // From social profile
+}
+```
+
+<Warning>
+**Password Field**: Users who sign up via social authentication have a `null` password. They must use social login or go through password reset to set a password.
+</Warning>
+
+## Frontend Integration
+
+Add social login buttons to your sign-in page:
+
+```tsx
+<Button
+  variant="outline"
+  onClick={() => window.location.href = '/google/redirect'}
+>
+  <GoogleIcon className="mr-2" />
+  Sign in with Google
+</Button>
+
+<Button
+  variant="outline"
+  onClick={() => window.location.href = '/github/redirect'}
+>
+  <GithubIcon className="mr-2" />
+  Sign in with GitHub
+</Button>
+```
+
+## Error Handling
+
+The controller handles common OAuth errors:
+
+- **Access Denied**: User canceled the OAuth flow
+- **State Mismatch**: CSRF token validation failed
+- **Provider Error**: OAuth provider returned an error
+
+Errors are flashed to the session and displayed on the sign-up page.
+
+## Security Considerations
+
+<CardGroup cols={2}>
+  <Card title="CSRF Protection" icon="shield">
+    OAuth state parameter prevents CSRF attacks during the authentication flow.
+  </Card>
+  <Card title="Email Verification" icon="envelope-circle-check">
+    Social providers verify email addresses, so users authenticated via OAuth have verified emails.
+  </Card>
+  <Card title="Secure Secrets" icon="key">
+    Never commit OAuth credentials to version control. Use environment variables.
+  </Card>
+  <Card title="HTTPS Required" icon="lock">
+    OAuth providers require HTTPS for production callback URLs.
+  </Card>
+</CardGroup>
+
+## Account Linking
+
+The current implementation automatically links social accounts to existing accounts with matching email addresses:
+
+```typescript
+let user = await User.findBy('email', socialUser.email)
+
+if (!user) {
+  // Create new account
+  user = await User.create({ ... })
+}
+
+// Log in existing or new user
+await auth.use('web').login(user)
+```
+
+## Translations
+
+Social authentication error messages in `app/auth/resources/lang/en/auth.json`:
+
+```json
+{
+  "social": {
+    "error": {
+      "access_denied": "Access was denied. Please try again.",
+      "state_mismatch": "Security validation failed. Please try again.",
+      "unknown": "An error occurred during authentication."
+    }
+  }
+}
+```
+
+<Check>
+**Production Ready**: Social authentication is secure, handles errors gracefully, and supports automatic account creation.
+</Check>

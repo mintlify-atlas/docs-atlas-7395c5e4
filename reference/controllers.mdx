@@ -1,0 +1,444 @@
+---
+title: Controllers
+description: Complete reference for all HTTP controllers in the AdonisJS Starter Kit
+---
+
+This reference documents all controllers that handle HTTP requests in the application.
+
+## Authentication Controllers
+
+### SignInController
+
+Handles user login and authentication.
+
+**Location:** `apps/web/app/auth/controllers/sign_in_controller.ts`
+
+<Accordion title="show()">
+  Renders the sign-in page.
+  
+  ```typescript
+  async show({ inertia }: HttpContext)
+  ```
+  
+  **Returns:** Inertia render of `auth/sign_in`
+</Accordion>
+
+<Accordion title="handle()">
+  Processes login credentials and authenticates the user.
+  
+  ```typescript
+  async handle({ auth, request, response, session, i18n }: HttpContext)
+  ```
+  
+  **Features:**
+  - Rate limiting (5 requests per minute)
+  - Blocks IPs for 1 minute after limit exceeded
+  - Validates credentials using `signInValidator`
+  - Supports safe return-to URLs after authentication
+  - Session regeneration for security
+  
+  **Validation:**
+  - Email: required, valid email format
+  - Password: required, minimum 1 character
+  
+  **Rate Limiting:**
+  ```typescript
+  private loginLimiter = limiter.use({
+    requests: 5,
+    duration: '1 min',
+    blockDuration: '1 min',
+  })
+  ```
+  
+  **Returns:** Redirects to return URL or after-auth route
+</Accordion>
+
+---
+
+### SignUpController
+
+Handles new user registration.
+
+**Location:** `apps/web/app/auth/controllers/sign_up_controller.ts`
+
+<Accordion title="show()">
+  Renders the registration page.
+  
+  ```typescript
+  async show({ inertia }: HttpContext)
+  ```
+  
+  **Returns:** Inertia render of `auth/sign_up`
+</Accordion>
+
+<Accordion title="handle()">
+  Creates a new user account and logs them in.
+  
+  ```typescript
+  async handle({ auth, request, response }: HttpContext)
+  ```
+  
+  **Validation:**
+  - Full Name: 3-255 characters
+  - Email: unique, valid format, lowercase
+  - Password: requires confirmation
+  
+  **Returns:** Redirects to after-auth route
+</Accordion>
+
+---
+
+### ForgotPasswordController
+
+Initiates password reset flow.
+
+**Location:** `apps/web/app/auth/controllers/forgot_password_controller.ts`
+
+<Accordion title="show()">
+  Renders the forgot password page.
+  
+  ```typescript
+  async show({ inertia }: HttpContext)
+  ```
+  
+  **Returns:** Inertia render of `auth/forgot_password`
+</Accordion>
+
+<Accordion title="handle()">
+  Generates a password reset token and sends email.
+  
+  ```typescript
+  async handle({ request, response, i18n }: HttpContext)
+  ```
+  
+  **Features:**
+  - Prevents user enumeration (always shows success)
+  - Generates secure reset token via PasswordResetService
+  - Emits `auth:forgot_password` event for email sending
+  - Includes i18n translations for email content
+  
+  **Security:**
+  If user doesn't exist, still redirects successfully to prevent attackers from determining valid email addresses.
+  
+  **Returns:** Redirects to sign-in page
+</Accordion>
+
+---
+
+### ResetPasswordController
+
+Completes password reset with token.
+
+**Location:** `apps/web/app/auth/controllers/reset_password_controller.ts`
+
+<Accordion title="show()">
+  Validates reset token and renders password reset page.
+  
+  ```typescript
+  async show({ params, inertia, response, session }: HttpContext)
+  ```
+  
+  **Parameters:**
+  - `params.token` - Password reset token from URL
+  
+  **Validation:**
+  - Checks token exists
+  - Verifies token hasn't expired
+  
+  **Returns:** Inertia render of `auth/reset_password` or redirect to forgot password on error
+</Accordion>
+
+<Accordion title="handle()">
+  Updates user password with new credentials.
+  
+  ```typescript
+  async handle({ request, params, response, session }: HttpContext)
+  ```
+  
+  **Features:**
+  - Validates reset token
+  - Updates user password (automatically hashed)
+  - Deletes all reset tokens for the user
+  - Clears rate limits for the user
+  
+  **Returns:** Redirects to sign-in page
+</Accordion>
+
+---
+
+## User Management Controllers
+
+### UsersController
+
+CRUD operations for user management.
+
+**Location:** `apps/web/app/users/controllers/users_controller.ts`
+
+<Accordion title="index()">
+  Lists users with search and filtering.
+  
+  ```typescript
+  async index({ bouncer, inertia, request }: HttpContext)
+  ```
+  
+  **Authorization:** Requires `viewList` permission via UserPolicy
+  
+  **Query Parameters:**
+  - `q` - Search by name or email (case-insensitive)
+  - `roleIds` - Filter by role IDs
+  - `page` - Page number (default: 1)
+  - `perPage` - Results per page (default: 10)
+  
+  **Features:**
+  - Pagination support
+  - Full-text search on name and email
+  - Role filtering
+  - Pre-computes avatar URLs
+  - Preloads role relationships
+  
+  **Returns:** Inertia render with paginated user data
+</Accordion>
+
+<Accordion title="store()">
+  Creates a new user.
+  
+  ```typescript
+  async store({ bouncer, request, response }: HttpContext)
+  ```
+  
+  **Authorization:** Requires `create` permission
+  
+  **Validation:**
+  - Full Name: 3-255 characters
+  - Email: unique, valid format
+  - Role ID: must exist in roles table
+  - Password: optional, generates CUID if not provided
+  
+  **Returns:** Redirects to users index
+</Accordion>
+
+<Accordion title="update()">
+  Updates an existing user.
+  
+  ```typescript
+  async update({ bouncer, params, request, response }: HttpContext)
+  ```
+  
+  **Authorization:** Requires `update` permission for specific user
+  
+  **Parameters:**
+  - `params.id` - User ID to update
+  
+  **Features:**
+  - Only updates provided fields
+  - Password is optional (keeps existing if not provided)
+  - Email uniqueness check excludes current user
+  
+  **Returns:** Redirects to users index
+</Accordion>
+
+<Accordion title="destroy()">
+  Deletes a user.
+  
+  ```typescript
+  async destroy({ bouncer, params, response }: HttpContext)
+  ```
+  
+  **Authorization:** Requires `delete` permission for specific user
+  
+  **Parameters:**
+  - `params.id` - User ID to delete
+  
+  **Returns:** Redirects to users index
+</Accordion>
+
+---
+
+### ProfileController
+
+Manages authenticated user's profile.
+
+**Location:** `apps/web/app/users/controllers/profile_controller.ts`
+
+<Accordion title="show()">
+  Displays the current user's profile.
+  
+  ```typescript
+  async show({ auth, inertia }: HttpContext)
+  ```
+  
+  **Features:**
+  - Pre-computes avatar URLs
+  - Returns user data via UserDto
+  
+  **Returns:** Inertia render of `users/profile`
+</Accordion>
+
+<Accordion title="handle()">
+  Updates the current user's profile.
+  
+  ```typescript
+  async handle({ auth, request, response }: HttpContext)
+  ```
+  
+  **Validation:**
+  - Full Name: 3-255 characters
+  - Avatar: PNG, JPG, JPEG, or GIF (max 1MB)
+  
+  **Features:**
+  - File upload support for avatars
+  - Creates attachment with variant processing
+  - Uses attachment manager for storage
+  
+  **Returns:** Redirects to profile page
+</Accordion>
+
+---
+
+### PasswordController
+
+Manages password changes for authenticated users.
+
+**Location:** `apps/web/app/users/controllers/password_controller.ts`
+
+<Accordion title="show()">
+  Renders the password change page.
+  
+  ```typescript
+  async show({ inertia }: HttpContext)
+  ```
+  
+  **Returns:** Inertia render of `users/password`
+</Accordion>
+
+<Accordion title="handle()">
+  Updates the user's password.
+  
+  ```typescript
+  async handle({ auth, request, response }: HttpContext)
+  ```
+  
+  **Validation:**
+  - Password: 1-255 characters, requires confirmation
+  
+  **Returns:** Redirects to password page
+</Accordion>
+
+---
+
+### TokensController
+
+Manages API access tokens for users.
+
+**Location:** `apps/web/app/users/controllers/tokens_controller.ts`
+
+<Accordion title="index()">
+  Lists all access tokens for the current user.
+  
+  ```typescript
+  async index({ auth, bouncer, inertia }: HttpContext)
+  ```
+  
+  **Authorization:** Requires `viewList` permission via TokenPolicy
+  
+  **Returns:** Inertia render with token list
+</Accordion>
+
+<Accordion title="store()">
+  Creates a new API access token.
+  
+  ```typescript
+  async store({ auth, bouncer, request }: HttpContext)
+  ```
+  
+  **Authorization:** Requires `create` permission
+  
+  **Validation:**
+  - Name: 3-255 characters (optional, defaults to "Secret Token")
+  
+  **Returns:**
+  ```typescript
+  {
+    type: string,  // Token type (usually 'bearer')
+    token: string  // The actual token value (only shown once)
+  }
+  ```
+  
+  <Warning>
+  The token value is only returned once during creation and cannot be retrieved again.
+  </Warning>
+</Accordion>
+
+<Accordion title="destroy()">
+  Deletes an API access token.
+  
+  ```typescript
+  async destroy({ auth, params, response }: HttpContext)
+  ```
+  
+  **Parameters:**
+  - `params.id` - Token ID to delete
+  
+  **Returns:** Redirects to tokens index
+</Accordion>
+
+---
+
+## Common Patterns
+
+<Tabs>
+  <Tab title="Authorization">
+    Controllers use Bouncer for authorization:
+    
+    ```typescript
+    await bouncer.with(UserPolicy).authorize('create')
+    ```
+    
+    Resource-specific authorization:
+    
+    ```typescript
+    await bouncer.with(UserPolicy).authorize('update', user)
+    ```
+  </Tab>
+  
+  <Tab title="Validation">
+    Request validation using Vine validators:
+    
+    ```typescript
+    const payload = await request.validateUsing(createUserValidator)
+    ```
+    
+    With metadata:
+    
+    ```typescript
+    const payload = await request.validateUsing(editUserValidator, {
+      meta: { userId: params.id }
+    })
+    ```
+  </Tab>
+  
+  <Tab title="Inertia Responses">
+    Rendering pages with Inertia:
+    
+    ```typescript
+    return inertia.render('users/index', {
+      users: UserDto.fromPaginator(users),
+      q: querySearch,
+    })
+    ```
+  </Tab>
+  
+  <Tab title="Redirects">
+    Redirecting to named routes:
+    
+    ```typescript
+    return response.redirect().toRoute('users.index')
+    ```
+    
+    Redirecting to paths:
+    
+    ```typescript
+    return response.redirect().toPath('/dashboard')
+    ```
+  </Tab>
+</Tabs>

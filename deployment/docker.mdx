@@ -1,0 +1,406 @@
+---
+title: Docker Setup
+description: Run the AdonisJS Starter Kit using Docker and Docker Compose
+---
+
+The AdonisJS Starter Kit includes complete Docker configuration for both development and production environments.
+
+## Development Setup
+
+### Prerequisites
+
+- Docker and Docker Compose installed
+- Git (to clone the repository)
+
+### Services Overview
+
+The development environment includes the following services:
+
+<CardGroup cols={3}>
+  <Card title="PostgreSQL" icon="database">
+    Production-grade database (PostgreSQL 18)
+  </Card>
+  <Card title="PgAdmin" icon="table">
+    Web-based database management
+  </Card>
+  <Card title="Mailpit" icon="envelope">
+    Email testing tool with web UI
+  </Card>
+</CardGroup>
+
+### Starting the Services
+
+The development environment uses `apps/web/docker-compose.yaml`:
+
+```bash
+cd apps/web
+docker compose up -d
+```
+
+<Note>
+  The root `docker-compose.yaml` includes the web app's compose file automatically.
+</Note>
+
+### Service Details
+
+#### PostgreSQL Database
+
+```yaml
+services:
+  pgsql:
+    container_name: '${COMPOSE_PROJECT_NAME}_pgsql'
+    image: postgres:18
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: '${DB_DATABASE:-default}'
+      POSTGRES_USER: '${DB_USER?:err}'
+      POSTGRES_PASSWORD: '${DB_PASSWORD:-secret}'
+```
+
+**Key Features:**
+- PostgreSQL 18 (latest stable)
+- Persistent volume for data
+- Health checks configured
+- Automatic initialization script
+
+**Accessing the Database:**
+
+```bash
+# Connect via psql
+docker exec -it ${COMPOSE_PROJECT_NAME}_pgsql psql -U root -d app
+
+# Connection string
+postgresql://root:root@localhost:5432/app
+```
+
+#### PgAdmin
+
+Web-based PostgreSQL administration tool.
+
+```yaml
+services:
+  pgadmin:
+    container_name: '${COMPOSE_PROJECT_NAME}_pgadmin'
+    image: dpage/pgadmin4:latest
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: '${PGADMIN_MAIL:-admin@repo.com}'
+      PGADMIN_DEFAULT_PASSWORD: '${PGADMIN_PW:-secret}'
+```
+
+**Access PgAdmin:**
+- URL: http://localhost:5050
+- Default Email: `admin@repo.com`
+- Default Password: `secret`
+
+<Tip>
+  PgAdmin servers are pre-configured using the `servers.json` file.
+</Tip>
+
+#### Mailpit
+
+Local email testing tool with a web interface.
+
+```yaml
+services:
+  mailpit:
+    container_name: '${COMPOSE_PROJECT_NAME}_mailpit'
+    image: axllent/mailpit
+    ports:
+      - 8025:8025  # Web UI
+      - 1025:1025  # SMTP server
+    environment:
+      MP_MAX_MESSAGES: 5000
+      MP_DATABASE: /data/mailpit.db
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+```
+
+**Features:**
+- Web UI at http://localhost:8025
+- SMTP server on port 1025
+- Stores up to 5,000 messages
+- No authentication required (development only)
+
+**Configure AdonisJS to use Mailpit:**
+
+```env
+SMTP_HOST=localhost
+SMTP_PORT=1025
+SMTP_USERNAME=user@host.com
+SMTP_PASSWORD=XXX
+SMTP_SECURE=0
+SMTP_REJECTUNAUTHORIZED=false
+```
+
+### Docker Compose Commands
+
+<CodeGroup>
+```bash Start Services
+docker compose up -d
+```
+
+```bash View Logs
+# All services
+docker compose logs -f
+
+# Specific service
+docker compose logs -f pgsql
+```
+
+```bash Stop Services
+docker compose down
+```
+
+```bash Restart Services
+docker compose restart
+```
+
+```bash Remove Volumes
+# Warning: This deletes all data
+docker compose down -v
+```
+</CodeGroup>
+
+## Production Setup
+
+The production setup uses `docker-compose.prod.yaml` with additional services.
+
+### Production Services
+
+```yaml
+services:
+  web:
+    container_name: '${COMPOSE_PROJECT_NAME}_web'
+    restart: always
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      HOST: web
+      NODE_ENV: production
+      DB_HOST: pgsql
+
+  proxy:
+    container_name: '${COMPOSE_PROJECT_NAME}_proxy'
+    restart: always
+    build:
+      context: ./.github/docker/nginx
+      dockerfile: Dockerfile
+    ports:
+      - 80:80
+      - 443:443
+```
+
+### Dockerfile Explained
+
+The production Dockerfile (`apps/web/Dockerfile`):
+
+```dockerfile
+FROM node:22-alpine
+
+# Install compatibility libraries
+RUN apk add --no-cache libc6-compat
+
+WORKDIR /app
+
+# Enable pnpm
+RUN npm install -g corepack@latest
+RUN corepack enable pnpm
+
+# Copy source code
+COPY . .
+
+# Install dependencies
+ENV CI=true
+RUN pnpm install --force --frozen-lockfile
+
+# Build the application
+WORKDIR /app/apps/web
+RUN node ace build --ignore-ts-errors
+
+# Run from build directory
+WORKDIR /app/apps/web/build
+
+EXPOSE 3333
+
+CMD ["node", "bin/server.js"]
+```
+
+**Build Stages:**
+1. Base image: Node.js 22 Alpine (minimal size)
+2. Install pnpm via corepack
+3. Install dependencies with frozen lockfile
+4. Build AdonisJS application
+5. Expose port 3333
+6. Run the compiled server
+
+### Nginx Reverse Proxy
+
+The proxy service uses Nginx to handle incoming requests:
+
+```nginx
+server {
+  listen 80;
+  server_name localhost;
+  client_max_body_size 100M;
+
+  location / {
+    proxy_pass http://web:3333;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection 'upgrade';
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_cache_bypass $http_upgrade;
+  }
+}
+```
+
+**Features:**
+- Reverse proxy to web service
+- 100MB upload limit
+- WebSocket support
+- Proper header forwarding
+
+### Running Production Stack
+
+```bash
+# Build and start production services
+docker compose -f docker-compose.prod.yaml up -d --build
+
+# View logs
+docker compose -f docker-compose.prod.yaml logs -f
+
+# Stop services
+docker compose -f docker-compose.prod.yaml down
+```
+
+<Warning>
+  The production PostgreSQL service has no exposed ports for security. Database access is only available within the Docker network.
+</Warning>
+
+## Networking
+
+All services use a shared bridge network named `sail`:
+
+```yaml
+networks:
+  sail:
+    driver: bridge
+```
+
+**Service Communication:**
+- Services communicate using container names
+- Web app connects to database at `pgsql:5432`
+- Nginx proxies to `web:3333`
+
+## Volumes
+
+Persistent data is stored in named volumes:
+
+```yaml
+volumes:
+  pgsql:    # PostgreSQL data
+  pgadmin:  # PgAdmin configuration
+```
+
+**Volume Management:**
+
+```bash
+# List volumes
+docker volume ls
+
+# Inspect volume
+docker volume inspect <project>_pgsql
+
+# Backup database
+docker exec <project>_pgsql pg_dump -U root app > backup.sql
+
+# Restore database
+cat backup.sql | docker exec -i <project>_pgsql psql -U root app
+```
+
+## Environment Variables
+
+Docker Compose uses environment variables from `.env` files:
+
+<Tabs>
+  <Tab title="Required Variables">
+    ```env
+    COMPOSE_PROJECT_NAME=myapp
+    DB_USER=root
+    DB_PASSWORD=secret
+    DB_DATABASE=app
+    ```
+  </Tab>
+  <Tab title="Optional Variables">
+    ```env
+    PGADMIN_MAIL=admin@repo.com
+    PGADMIN_PW=secret
+    NGINX_HOST=localhost
+    NGINX_PORT=80
+    PORT=3333
+    ```
+  </Tab>
+</Tabs>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Port already in use">
+    Check if ports 5432, 5050, 8025, or 1025 are already in use:
+    ```bash
+    # Check port usage
+    lsof -i :5432
+    
+    # Change ports in docker-compose.yaml
+    ports:
+      - "5433:5432"  # Use different host port
+    ```
+  </Accordion>
+
+  <Accordion title="Database connection refused">
+    1. Check if PostgreSQL is running:
+       ```bash
+       docker compose ps
+       ```
+    2. Check database logs:
+       ```bash
+       docker compose logs pgsql
+       ```
+    3. Verify environment variables in `.env`
+  </Accordion>
+
+  <Accordion title="Permission denied errors">
+    Volume permissions issue:
+    ```bash
+    # Reset volumes
+    docker compose down -v
+    docker compose up -d
+    ```
+  </Accordion>
+
+  <Accordion title="Build failures">
+    Clear Docker cache and rebuild:
+    ```bash
+    docker compose build --no-cache
+    docker compose up -d
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Configuration" icon="gear" href="/deployment/environment">
+    Configure environment variables for different environments
+  </Card>
+  <Card title="Production Deployment" icon="rocket" href="/deployment/production">
+    Deploy to production servers
+  </Card>
+</CardGroup>

@@ -1,0 +1,182 @@
+---
+title: 'User Impersonation'
+description: 'Learn how to implement and use the user impersonation feature for administrative support and testing'
+icon: 'user-secret'
+---
+
+## Overview
+
+User impersonation allows administrators to temporarily log in as another user without knowing their password. This is particularly useful for:
+
+- Providing customer support
+- Testing user-specific issues
+- Debugging permission problems
+- Quality assurance testing
+
+<Warning>
+User impersonation is a powerful feature that should only be available to trusted administrators. It provides full access to the impersonated user's account.
+</Warning>
+
+## How It Works
+
+The impersonation system uses AdonisJS sessions to store the original user's ID before switching to the target user. This allows administrators to seamlessly switch back to their own account.
+
+### Authorization Policy
+
+Impersonation is controlled by a dedicated policy that ensures only admins can impersonate users, and prevents self-impersonation:
+
+```typescript app/users/policies/impersonate_policy.ts
+import { BasePolicy } from '@adonisjs/bouncer'
+import { AuthorizerResponse } from '@adonisjs/bouncer/types'
+import User from '#users/models/user'
+
+export default class ImpersonatePolicy extends BasePolicy {
+  create(currentUser: User, user: User): AuthorizerResponse {
+    return currentUser.isAdmin && currentUser.id !== user.id
+  }
+}
+```
+
+<Tip>
+The policy checks two conditions:
+1. The current user must be an admin (`currentUser.isAdmin`)
+2. The admin cannot impersonate themselves (`currentUser.id !== user.id`)
+</Tip>
+
+## Implementation
+
+### Controller
+
+The impersonation controller handles the session management and authentication:
+
+```typescript app/users/controllers/impersonates_controller.ts
+import type { HttpContext } from '@adonisjs/core/http'
+import { afterAuthRedirectRoute } from '#config/auth'
+import User from '#users/models/user'
+import ImpersonatePolicy from '#users/policies/impersonate_policy'
+
+export default class ImpersonatesController {
+  async store({ session, bouncer, params, response, auth }: HttpContext) {
+    const impersonatedUser = await User.findOrFail(params.id)
+
+    // Check if the current user has permission to impersonate
+    await bouncer.with(ImpersonatePolicy).authorize('create', impersonatedUser)
+
+    // Store the original user ID in the session
+    session.put('originalUserId', auth.user!.id)
+    
+    // Log in as the target user
+    await auth.use('web').login(impersonatedUser)
+
+    return response.redirect().toRoute(afterAuthRedirectRoute)
+  }
+}
+```
+
+### Route Setup
+
+Add the impersonation route to your routes file:
+
+```typescript app/users/routes.ts
+import { middleware } from '#start/kernel'
+import router from '@adonisjs/core/services/router'
+
+const ImpersonatesController = () => import('#users/controllers/impersonates_controller')
+
+router
+  .post('/users/impersonate/:id', [ImpersonatesController, 'store'])
+  .middleware(middleware.auth())
+```
+
+### Registering the Policy
+
+Register the impersonation policy in your policies configuration:
+
+```typescript app/core/policies/main.ts
+export const policies = {
+  UserPolicy: () => import('#users/policies/user_policy'),
+  ImpersonatePolicy: () => import('#users/policies/impersonate_policy'),
+  TokenPolicy: () => import('#users/policies/token_policy'),
+}
+```
+
+## Using Impersonation
+
+### Starting an Impersonation Session
+
+To impersonate a user, make a POST request to the impersonation endpoint:
+
+```typescript
+// Using Inertia.js
+import { router } from '@inertiajs/react'
+
+const impersonateUser = (userId: number) => {
+  router.post(`/users/impersonate/${userId}`)
+}
+```
+
+### Ending an Impersonation Session
+
+To stop impersonating and return to your original account, implement a stop impersonation endpoint:
+
+```typescript
+export default class ImpersonatesController {
+  async destroy({ session, auth, response }: HttpContext) {
+    const originalUserId = session.get('originalUserId')
+    
+    if (originalUserId) {
+      const originalUser = await User.findOrFail(originalUserId)
+      await auth.use('web').login(originalUser)
+      session.forget('originalUserId')
+    }
+    
+    return response.redirect().toRoute(afterAuthRedirectRoute)
+  }
+}
+```
+
+## Security Considerations
+
+<CardGroup cols={2}>
+  <Card title="Audit Logging" icon="scroll">
+    Consider logging all impersonation events for security audits and compliance.
+  </Card>
+  <Card title="Time Limits" icon="clock">
+    Implement session timeouts for impersonation to automatically end sessions after a period.
+  </Card>
+  <Card title="Notifications" icon="bell">
+    Optionally notify users when their account has been accessed through impersonation.
+  </Card>
+  <Card title="Permission Checks" icon="shield">
+    Always verify admin status server-side, never trust client-side checks alone.
+  </Card>
+</CardGroup>
+
+## UI Integration
+
+The starter kit includes a React dialog component for triggering impersonation:
+
+```typescript
+// Example UI button
+<Button 
+  onClick={() => impersonateUser(user.id)}
+  disabled={!canImpersonate}
+>
+  Impersonate User
+</Button>
+```
+
+<Note>
+The impersonation feature is already implemented in the starter kit's user management interface. Admins will see an "Impersonate" option in the user list.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authorization" icon="lock" href="/features/authorization">
+    Learn more about the authorization system and policies
+  </Card>
+  <Card title="User Management" icon="users" href="/features/user-management">
+    Explore the complete user management features
+  </Card>
+</CardGroup>

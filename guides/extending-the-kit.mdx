@@ -1,0 +1,680 @@
+---
+title: 'Extending the Kit'
+description: 'Learn how to extend and customize the AdonisJS Starter Kit for your specific needs'
+icon: 'puzzle-piece'
+---
+
+## Overview
+
+The AdonisJS Starter Kit is designed to be a solid foundation for your application while remaining flexible and extensible. This guide covers best practices for customizing and extending the kit without breaking its core functionality.
+
+## Architecture Overview
+
+The starter kit uses a modular architecture powered by [@adonisjs-community/modules](https://github.com/adonisjs-community/modules):
+
+```
+apps/web/app/
+├── analytics/     # Analytics module
+├── auth/          # Authentication module
+├── common/        # Shared utilities
+├── core/          # Core functionality
+├── marketing/     # Marketing pages
+└── users/         # User management module
+```
+
+<Note>
+Each module is self-contained with its own controllers, models, policies, routes, and UI components.
+</Note>
+
+## Creating New Modules
+
+### Generate a Module
+
+Create a new feature module using the AdonisJS CLI:
+
+```bash
+node ace make:module blog
+```
+
+This creates a new module structure:
+
+```
+app/blog/
+├── controllers/
+├── models/
+├── policies/
+├── services/
+├── validators/
+├── routes.ts
+└── start/
+```
+
+### Generate Module Resources
+
+Generate resources scoped to your module:
+
+```bash
+# Generate a controller
+node ace make:controller posts -m=blog
+
+# Generate a model
+node ace make:model post -m=blog
+
+# Generate a policy
+node ace make:policy post_policy -m=blog
+
+# Generate a validator
+node ace make:validator create_post -m=blog
+```
+
+<Tip>
+The `-m=blog` flag ensures files are generated inside the blog module.
+</Tip>
+
+## Adding Custom Models
+
+### Extend BaseModel
+
+All models should extend the BaseModel for consistent timestamps and serialization:
+
+```typescript app/blog/models/post.ts
+import { column, belongsTo } from '@adonisjs/lucid/orm'
+import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import BaseModel from '#common/models/base_model'
+import User from '#users/models/user'
+
+export default class Post extends BaseModel {
+  @column({ isPrimary: true })
+  declare id: number
+
+  @column()
+  declare authorId: number
+
+  @column()
+  declare title: string
+
+  @column()
+  declare content: string
+
+  @column()
+  declare publishedAt: DateTime | null
+
+  @belongsTo(() => User, {
+    foreignKey: 'authorId',
+  })
+  declare author: BelongsTo<typeof User>
+}
+```
+
+### Add File Attachments
+
+Extend models with file attachment support:
+
+```typescript
+import { attachment } from '@jrmc/adonis-attachment'
+import type { Attachment } from '@jrmc/adonis-attachment/types/attachment'
+
+export default class Post extends BaseModel {
+  // ... other columns
+
+  @attachment({ preComputeUrl: false, variants: ['thumbnail', 'large'] })
+  declare featuredImage: Attachment
+}
+```
+
+## Creating Custom Policies
+
+### Define Resource Policies
+
+Create authorization policies following the starter kit's pattern:
+
+```typescript app/blog/policies/post_policy.ts
+import { BasePolicy } from '@adonisjs/bouncer'
+import { AuthorizerResponse } from '@adonisjs/bouncer/types'
+import User from '#users/models/user'
+import Post from '#blog/models/post'
+
+export default class PostPolicy extends BasePolicy {
+  viewList(user: User): AuthorizerResponse {
+    return true // Everyone can view post list
+  }
+
+  view(user: User, post: Post): AuthorizerResponse {
+    // Can view if published or if author/admin
+    return (
+      post.publishedAt !== null ||
+      user.id === post.authorId ||
+      user.isAdmin
+    )
+  }
+
+  create(user: User): AuthorizerResponse {
+    return true // Authenticated users can create posts
+  }
+
+  update(user: User, post: Post): AuthorizerResponse {
+    return user.id === post.authorId || user.isAdmin
+  }
+
+  delete(user: User, post: Post): AuthorizerResponse {
+    return user.id === post.authorId || user.isAdmin
+  }
+
+  publish(user: User, post: Post): AuthorizerResponse {
+    // Only author and admins can publish
+    return user.id === post.authorId || user.isAdmin
+  }
+}
+```
+
+### Register the Policy
+
+Add your policy to the main policies configuration:
+
+```typescript app/core/policies/main.ts
+export const policies = {
+  // Existing policies
+  UserPolicy: () => import('#users/policies/user_policy'),
+  ImpersonatePolicy: () => import('#users/policies/impersonate_policy'),
+  TokenPolicy: () => import('#users/policies/token_policy'),
+  
+  // Your new policies
+  PostPolicy: () => import('#blog/policies/post_policy'),
+}
+```
+
+## Adding Custom Routes
+
+### Module Routes
+
+Define routes in your module's `routes.ts`:
+
+```typescript app/blog/routes.ts
+import { middleware } from '#start/kernel'
+import router from '@adonisjs/core/services/router'
+
+const PostsController = () => import('#blog/controllers/posts_controller')
+const CommentsController = () => import('#blog/controllers/comments_controller')
+
+// Public routes
+router.get('/blog', [PostsController, 'index']).as('blog.index')
+router.get('/blog/:slug', [PostsController, 'show']).as('blog.show')
+
+// Protected routes
+router
+  .group(() => {
+    router
+      .resource('/blog/posts', PostsController)
+      .except(['index', 'show'])
+      .as('blog.posts')
+    
+    router.post('/blog/posts/:id/publish', [PostsController, 'publish'])
+    router.resource('/blog/posts/:postId/comments', CommentsController)
+  })
+  .use(middleware.auth())
+```
+
+### Register Module Routes
+
+Register your module routes in `adonisrc.ts`:
+
+```typescript adonisrc.ts
+export default defineConfig({
+  // ... other config
+  
+  preloads: [
+    () => import('#start/kernel'),
+    
+    // Existing modules
+    () => import('#marketing/routes'),
+    () => import('#auth/start/view'),
+    () => import('#auth/start/events'),
+    () => import('#auth/routes'),
+    () => import('#users/start/view'),
+    () => import('#users/start/events'),
+    () => import('#users/routes'),
+    () => import('#analytics/routes'),
+    
+    // Your new module
+    () => import('#blog/routes'),
+  ],
+})
+```
+
+## Creating Custom Controllers
+
+### Follow the Pattern
+
+Implement controllers following the starter kit's conventions:
+
+```typescript app/blog/controllers/posts_controller.ts
+import type { HttpContext } from '@adonisjs/core/http'
+import Post from '#blog/models/post'
+import PostPolicy from '#blog/policies/post_policy'
+import { createPostValidator, updatePostValidator } from '#blog/validators'
+
+export default class PostsController {
+  async index({ inertia, request }: HttpContext) {
+    const page = request.input('page', 1)
+    const posts = await Post.query()
+      .whereNotNull('published_at')
+      .preload('author')
+      .orderBy('published_at', 'desc')
+      .paginate(page, 10)
+
+    return inertia.render('blog/index', { posts })
+  }
+
+  async show({ inertia, params, bouncer }: HttpContext) {
+    const post = await Post.query()
+      .where('slug', params.slug)
+      .preload('author')
+      .firstOrFail()
+
+    await bouncer.with(PostPolicy).authorize('view', post)
+
+    return inertia.render('blog/show', { post })
+  }
+
+  async store({ request, response, auth, bouncer }: HttpContext) {
+    await bouncer.with(PostPolicy).authorize('create')
+
+    const payload = await request.validateUsing(createPostValidator)
+    const post = await Post.create({
+      ...payload,
+      authorId: auth.user!.id,
+    })
+
+    return response.redirect().toRoute('blog.posts.show', { id: post.id })
+  }
+
+  async update({ request, params, response, bouncer }: HttpContext) {
+    const post = await Post.findOrFail(params.id)
+    await bouncer.with(PostPolicy).authorize('update', post)
+
+    const payload = await request.validateUsing(updatePostValidator)
+    post.merge(payload)
+    await post.save()
+
+    return response.redirect().toRoute('blog.posts.show', { id: post.id })
+  }
+
+  async destroy({ params, response, bouncer }: HttpContext) {
+    const post = await Post.findOrFail(params.id)
+    await bouncer.with(PostPolicy).authorize('delete', post)
+
+    await post.delete()
+
+    return response.redirect().toRoute('blog.index')
+  }
+}
+```
+
+## Adding Custom Validators
+
+### VineJS Validators
+
+Create type-safe validators using VineJS:
+
+```typescript app/blog/validators.ts
+import vine from '@vinejs/vine'
+import { baseSearchValidator } from '#common/validators/search'
+
+export const createPostValidator = vine.compile(
+  vine.object({
+    title: vine.string().trim().minLength(3).maxLength(255),
+    content: vine.string().trim().minLength(10),
+    slug: vine
+      .string()
+      .trim()
+      .toLowerCase()
+      .unique({ table: 'posts', column: 'slug' }),
+    featuredImage: vine
+      .file({
+        extnames: ['png', 'jpg', 'jpeg', 'webp'],
+        size: 2 * 1024 * 1024, // 2MB
+      })
+      .nullable(),
+  })
+)
+
+export const updatePostValidator = vine.withMetaData<{ postId: number }>().compile(
+  vine.object({
+    title: vine.string().trim().minLength(3).maxLength(255),
+    content: vine.string().trim().minLength(10),
+    slug: vine
+      .string()
+      .trim()
+      .toLowerCase()
+      .unique(async (_, value, field) => {
+        const row = await Post.query()
+          .where('slug', value)
+          .whereNot('id', field.meta.postId)
+          .first()
+        return row ? false : true
+      }),
+  })
+)
+
+export const listPostsValidator = vine.compile(
+  vine.object({
+    ...baseSearchValidator.getProperties(),
+    status: vine.enum(['published', 'draft', 'all']).optional(),
+    authorId: vine.number().exists({ table: 'users', column: 'id' }).optional(),
+  })
+)
+```
+
+## Extending the UI
+
+### Adding ShadCN Components
+
+Install additional UI components:
+
+```bash
+pnpm dlx shadcn@latest add tabs -c apps/web
+pnpm dlx shadcn@latest add separator -c apps/web
+pnpm dlx shadcn@latest add textarea -c apps/web
+```
+
+### Create Module-Specific Components
+
+Organize React components within your module:
+
+```
+app/blog/
+└── ui/
+    ├── components/
+    │   ├── post_card.tsx
+    │   ├── post_editor.tsx
+    │   └── comment_list.tsx
+    └── pages/
+        ├── index.tsx
+        ├── show.tsx
+        └── edit.tsx
+```
+
+### Example Component
+
+```tsx app/blog/ui/components/post_card.tsx
+import { Link } from '@inertiajs/react'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { formatDate } from '@/lib/utils'
+
+interface PostCardProps {
+  post: {
+    id: number
+    title: string
+    excerpt: string
+    publishedAt: string
+    author: {
+      fullName: string
+    }
+  }
+}
+
+export function PostCard({ post }: PostCardProps) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          <Link href={`/blog/${post.id}`}>{post.title}</Link>
+        </CardTitle>
+        <CardDescription>
+          By {post.author.fullName} • {formatDate(post.publishedAt)}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p className="text-muted-foreground">{post.excerpt}</p>
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+## Adding Custom Services
+
+### Service Layer Pattern
+
+Create service classes for complex business logic:
+
+```typescript app/blog/services/post_service.ts
+import Post from '#blog/models/post'
+import User from '#users/models/user'
+import { DateTime } from 'luxon'
+
+export default class PostService {
+  static async publish(post: Post): Promise<void> {
+    post.publishedAt = DateTime.now()
+    await post.save()
+    
+    // Send notifications, update search index, etc.
+    await this.notifySubscribers(post)
+    await this.updateSearchIndex(post)
+  }
+
+  static async unpublish(post: Post): Promise<void> {
+    post.publishedAt = null
+    await post.save()
+    
+    await this.removeFromSearchIndex(post)
+  }
+
+  static async generateSlug(title: string): Promise<string> {
+    const baseSlug = title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+
+    let slug = baseSlug
+    let counter = 1
+
+    while (await Post.findBy('slug', slug)) {
+      slug = `${baseSlug}-${counter}`
+      counter++
+    }
+
+    return slug
+  }
+
+  private static async notifySubscribers(post: Post): Promise<void> {
+    // Implementation
+  }
+
+  private static async updateSearchIndex(post: Post): Promise<void> {
+    // Implementation
+  }
+
+  private static async removeFromSearchIndex(post: Post): Promise<void> {
+    // Implementation
+  }
+}
+```
+
+## Database Migrations
+
+### Create Module Migrations
+
+```bash
+node ace make:migration create_posts_table
+```
+
+```typescript database/migrations/xxx_create_posts_table.ts
+import { BaseSchema } from '@adonisjs/lucid/schema'
+
+export default class extends BaseSchema {
+  protected tableName = 'posts'
+
+  async up() {
+    this.schema.createTable(this.tableName, (table) => {
+      table.increments('id')
+      table.integer('author_id').unsigned().references('users.id').onDelete('CASCADE')
+      table.string('title', 255).notNullable()
+      table.string('slug', 255).notNullable().unique()
+      table.text('content').notNullable()
+      table.text('excerpt').nullable()
+      table.timestamp('published_at').nullable()
+      table.timestamp('created_at')
+      table.timestamp('updated_at')
+    })
+  }
+
+  async down() {
+    this.schema.dropTable(this.tableName)
+  }
+}
+```
+
+## Testing Your Extensions
+
+### Unit Tests
+
+```typescript tests/unit/blog/post_service.spec.ts
+import { test } from '@japa/runner'
+import PostService from '#blog/services/post_service'
+
+test.group('PostService', () => {
+  test('generates unique slug', async ({ assert }) => {
+    const slug = await PostService.generateSlug('My Awesome Post')
+    assert.equal(slug, 'my-awesome-post')
+  })
+
+  test('appends counter to duplicate slugs', async ({ assert }) => {
+    await Post.create({ slug: 'duplicate', title: 'Test' })
+    const slug = await PostService.generateSlug('Duplicate')
+    assert.equal(slug, 'duplicate-1')
+  })
+})
+```
+
+### Functional Tests
+
+```typescript tests/functional/blog/posts.spec.ts
+import { test } from '@japa/runner'
+import User from '#users/models/user'
+import Roles from '#users/enums/role'
+
+test.group('Posts', (group) => {
+  test('authenticated user can create post', async ({ client }) => {
+    const user = await User.create({
+      email: 'test@example.com',
+      roleId: Roles.USER,
+    })
+
+    const response = await client
+      .post('/blog/posts')
+      .loginAs(user)
+      .form({
+        title: 'Test Post',
+        slug: 'test-post',
+        content: 'This is a test post content.',
+      })
+
+    response.assertRedirectsToRoute('blog.posts.show')
+  })
+
+  test('guest cannot create post', async ({ client }) => {
+    const response = await client.post('/blog/posts').form({
+      title: 'Test Post',
+      slug: 'test-post',
+      content: 'This is a test post content.',
+    })
+
+    response.assertRedirectsToRoute('auth.signIn.show')
+  })
+})
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Follow the Module Structure">
+    Keep your code organized by placing related files in the same module. This makes the codebase more maintainable and easier to navigate.
+  </Accordion>
+  
+  <Accordion title="Use TypeScript Aliases">
+    Use the configured path aliases (`#blog/*`, `#users/*`, etc.) instead of relative imports for cleaner code.
+  </Accordion>
+  
+  <Accordion title="Leverage Existing Patterns">
+    Study the existing modules (users, auth) and follow their patterns for consistency.
+  </Accordion>
+  
+  <Accordion title="Keep Business Logic in Services">
+    Controllers should be thin - move complex business logic to service classes.
+  </Accordion>
+  
+  <Accordion title="Always Validate Input">
+    Use VineJS validators for all user input to ensure type safety and validation.
+  </Accordion>
+  
+  <Accordion title="Test Your Extensions">
+    Write tests for new features to ensure they work correctly and don't break existing functionality.
+  </Accordion>
+</AccordionGroup>
+
+## Common Customizations
+
+### Adding a New Role
+
+```typescript app/users/enums/role.ts
+enum Roles {
+  ADMIN = 1,
+  USER = 2,
+  EDITOR = 3, // New role
+  VIEWER = 4, // New role
+}
+```
+
+### Custom Email Templates
+
+Add custom mail templates in `resources/mails/`:
+
+```edge
+{{-- resources/mails/post_published.edge --}}
+@component('mail/main')
+  <h1>Your post has been published!</h1>
+  <p>Hi {{ user.fullName }},</p>
+  <p>Your post "{{ post.title }}" is now live.</p>
+  <a href="{{ postUrl }}">View Post</a>
+@end
+```
+
+### Custom Middleware
+
+```typescript app/blog/middleware/track_post_view_middleware.ts
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+import PostView from '#blog/models/post_view'
+
+export default class TrackPostViewMiddleware {
+  async handle(ctx: HttpContext, next: NextFn) {
+    await next()
+
+    // Track post view after response
+    if (ctx.params.id && ctx.auth.user) {
+      await PostView.create({
+        postId: ctx.params.id,
+        userId: ctx.auth.user.id,
+      })
+    }
+  }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Creating Modules" icon="cube" href="/guides/creating-modules">
+    Deep dive into the module system
+  </Card>
+  <Card title="Project Structure" icon="folder-tree" href="/structure/modules">
+    Understand the modular architecture
+  </Card>
+  <Card title="Custom Abilities" icon="shield" href="/guides/custom-abilities">
+    Create custom authorization logic
+  </Card>
+  <Card title="File Attachments" icon="paperclip" href="/guides/file-attachments">
+    Add file upload capabilities
+  </Card>
+</CardGroup>

@@ -1,0 +1,376 @@
+---
+title: Appearance Settings
+description: Theme customization and dark mode support for personalized user experience
+icon: palette
+---
+
+## Overview
+
+The AdonisJS Starter Kit includes appearance customization features, allowing users to personalize their experience with theme preferences. The system supports light and dark modes with automatic detection and manual switching.
+
+## Appearance Route
+
+The appearance settings page is accessible to authenticated users:
+
+```typescript app/users/routes.ts
+import router from '@adonisjs/core/services/router'
+import { middleware } from '#start/kernel'
+
+router
+  .get('/settings/appearance', ({ inertia }) => {
+    return inertia.render('users/appearance')
+  })
+  .middleware(middleware.auth())
+  .as('appearance.show')
+```
+
+<Info>
+**Settings Integration**: The appearance page is part of the user settings section, accessible from `/settings/appearance`.
+</Info>
+
+## Theme Storage
+
+Theme preferences are stored in cookies for persistence across sessions:
+
+```typescript app/common/ui/utils/cookie_helper.ts
+export function setThemeCookie(theme: 'light' | 'dark' | 'system') {
+  document.cookie = `theme=${theme}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`
+}
+
+export function getThemeCookie(): string | null {
+  const cookies = document.cookie.split('; ')
+  const themeCookie = cookies.find(cookie => cookie.startsWith('theme='))
+  return themeCookie ? themeCookie.split('=')[1] : null
+}
+```
+
+## Theme Detection
+
+The system automatically detects the user's preferred color scheme:
+
+```typescript
+function detectSystemTheme(): 'light' | 'dark' {
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    return 'dark'
+  }
+  return 'light'
+}
+
+function applyTheme(theme: 'light' | 'dark' | 'system') {
+  const root = document.documentElement
+  
+  if (theme === 'system') {
+    const systemTheme = detectSystemTheme()
+    root.classList.toggle('dark', systemTheme === 'dark')
+  } else {
+    root.classList.toggle('dark', theme === 'dark')
+  }
+}
+```
+
+## Theme Options
+
+Users can choose from three theme modes:
+
+<CardGroup cols={3}>
+  <Card title="Light Mode" icon="sun">
+    Bright interface optimized for well-lit environments.
+  </Card>
+  <Card title="Dark Mode" icon="moon">
+    Dark interface that reduces eye strain in low-light conditions.
+  </Card>
+  <Card title="System" icon="display">
+    Automatically matches your operating system's theme preference.
+  </Card>
+</CardGroup>
+
+## Frontend Implementation
+
+### Theme Provider Context
+
+```tsx
+import { createContext, useContext, useEffect, useState } from 'react'
+
+type Theme = 'light' | 'dark' | 'system'
+
+interface ThemeContextType {
+  theme: Theme
+  setTheme: (theme: Theme) => void
+}
+
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setThemeState] = useState<Theme>('system')
+
+  useEffect(() => {
+    const savedTheme = getThemeCookie() as Theme
+    if (savedTheme) {
+      setThemeState(savedTheme)
+      applyTheme(savedTheme)
+    }
+  }, [])
+
+  const setTheme = (newTheme: Theme) => {
+    setThemeState(newTheme)
+    setThemeCookie(newTheme)
+    applyTheme(newTheme)
+  }
+
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  )
+}
+
+export function useTheme() {
+  const context = useContext(ThemeContext)
+  if (!context) {
+    throw new Error('useTheme must be used within ThemeProvider')
+  }
+  return context
+}
+```
+
+### Theme Switcher Component
+
+```tsx
+import { useTheme } from '#common/ui/context/theme_context'
+import { Moon, Sun, Monitor } from 'lucide-react'
+
+export function ThemeSwitcher() {
+  const { theme, setTheme } = useTheme()
+
+  return (
+    <div className="flex gap-2">
+      <button
+        onClick={() => setTheme('light')}
+        className={`p-2 rounded ${theme === 'light' ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}
+      >
+        <Sun className="h-5 w-5" />
+        <span className="sr-only">Light mode</span>
+      </button>
+      
+      <button
+        onClick={() => setTheme('dark')}
+        className={`p-2 rounded ${theme === 'dark' ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}
+      >
+        <Moon className="h-5 w-5" />
+        <span className="sr-only">Dark mode</span>
+      </button>
+      
+      <button
+        onClick={() => setTheme('system')}
+        className={`p-2 rounded ${theme === 'system' ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}
+      >
+        <Monitor className="h-5 w-5" />
+        <span className="sr-only">System theme</span>
+      </button>
+    </div>
+  )
+}
+```
+
+## CSS Variables
+
+Themes are implemented using CSS custom properties:
+
+```css
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --primary: 222.2 47.4% 11.2%;
+  --primary-foreground: 210 40% 98%;
+  /* ... more variables */
+}
+
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --primary: 210 40% 98%;
+  --primary-foreground: 222.2 47.4% 11.2%;
+  /* ... more variables */
+}
+```
+
+## Appearance Settings Page
+
+The appearance page provides a user-friendly interface for theme selection:
+
+```tsx
+import { Head } from '@inertiajs/react'
+import { ThemeSwitcher } from '#common/ui/components/theme_switcher'
+
+export default function Appearance() {
+  return (
+    <>
+      <Head title="Appearance" />
+      
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold">Appearance</h2>
+          <p className="text-muted-foreground">
+            Customize the appearance of your interface
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-medium mb-2">Theme</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Select the theme for your dashboard
+            </p>
+            <ThemeSwitcher />
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+```
+
+## System Theme Detection
+
+Listen for system theme changes when using "System" mode:
+
+```typescript
+const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+
+mediaQuery.addEventListener('change', (e) => {
+  const theme = getThemeCookie()
+  if (theme === 'system') {
+    applyTheme('system')
+  }
+})
+```
+
+## Initialization Script
+
+Prevent flash of unstyled content by applying theme before page render:
+
+```html
+<script>
+  (function() {
+    const theme = document.cookie
+      .split('; ')
+      .find(row => row.startsWith('theme='))
+      ?.split('=')[1] || 'system'
+    
+    if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark')
+    }
+  })()
+</script>
+```
+
+<Warning>
+**Placement**: This script must be placed in the `<head>` tag before any content renders to prevent theme flash.
+</Warning>
+
+## Navigation Integration
+
+Add theme switcher to your navigation:
+
+```typescript app/common/ui/config/navigation.config.ts
+export const settingsNavigation = [
+  {
+    name: 'Profile',
+    href: '/settings/profile',
+    icon: UserIcon,
+  },
+  {
+    name: 'Password',
+    href: '/settings/password',
+    icon: KeyIcon,
+  },
+  {
+    name: 'Appearance',
+    href: '/settings/appearance',
+    icon: PaletteIcon,
+  },
+  {
+    name: 'Tokens',
+    href: '/settings/tokens',
+    icon: ShieldIcon,
+  },
+]
+```
+
+## Tailwind Configuration
+
+Enable dark mode in Tailwind:
+
+```javascript tailwind.config.js
+module.exports = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
+        // ... more colors
+      },
+    },
+  },
+}
+```
+
+## Theme-Aware Components
+
+Create components that adapt to theme:
+
+```tsx
+export function Card({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="bg-card text-card-foreground rounded-lg border shadow-sm">
+      {children}
+    </div>
+  )
+}
+```
+
+## User Preferences
+
+The appearance settings are part of the broader user preferences system:
+
+- **Persistent**: Stored in cookies with 1-year expiry
+- **Cross-device**: Users can set different themes on different devices
+- **Instant**: Changes apply immediately without page reload
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Test Both Themes" icon="vial">
+    Always test your UI in both light and dark modes to ensure readability.
+  </Card>
+  <Card title="Semantic Colors" icon="palette">
+    Use semantic color variables (e.g., `text-foreground`) instead of absolute colors.
+  </Card>
+  <Card title="Contrast Ratios" icon="eye">
+    Ensure sufficient contrast in both themes for accessibility (WCAG AA standard).
+  </Card>
+  <Card title="System Preference" icon="display">
+    Default to system theme to respect user's OS preferences.
+  </Card>
+</CardGroup>
+
+## Extending Themes
+
+Add custom theme variants:
+
+```css
+[data-theme="ocean"] {
+  --primary: 210 100% 50%;
+  --primary-foreground: 210 100% 98%;
+  /* ... custom colors */
+}
+```
+
+<Check>
+**Modern Experience**: The appearance system provides a polished, modern user experience with smooth theme transitions and system integration.
+</Check>

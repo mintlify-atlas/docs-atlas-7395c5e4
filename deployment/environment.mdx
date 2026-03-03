@@ -1,0 +1,676 @@
+---
+title: Environment Configuration
+description: Configure environment variables for the AdonisJS Starter Kit
+---
+
+The AdonisJS Starter Kit uses environment variables for configuration. This guide covers all available variables and their usage.
+
+## Environment File
+
+Environment variables are stored in `.env` files:
+
+```bash
+app/
+├── .env.example          # Template with all variables
+├── .env                  # Your local configuration (gitignored)
+└── .env.production       # Production overrides (optional)
+```
+
+<Warning>
+  Never commit `.env` files to version control. Only `.env.example` should be tracked.
+</Warning>
+
+## Getting Started
+
+Create your local environment file:
+
+```bash
+cd apps/web
+cp .env.example .env
+```
+
+Generate application key:
+
+```bash
+node ace generate:key
+```
+
+<Note>
+  The `APP_KEY` is used for encryption and must be kept secret in production.
+</Note>
+
+## Core Configuration
+
+### Application Settings
+
+<ParamField path="NODE_ENV" type="string" default="development" required>
+  Application environment. Controls behavior, logging, and optimizations.
+  
+  <Expandable title="Options">
+    - `development` - Local development with hot reloading
+    - `production` - Optimized for production deployment
+    - `test` - Used during automated testing
+  </Expandable>
+</ParamField>
+
+<ParamField path="PORT" type="number" default="3333" required>
+  Port number the application listens on.
+  
+  ```env
+  PORT=3333
+  ```
+</ParamField>
+
+<ParamField path="HOST" type="string" default="localhost" required>
+  Host address to bind to. Use `0.0.0.0` to accept connections from any network interface.
+  
+  ```env
+  # Development
+  HOST=localhost
+  
+  # Production (Docker)
+  HOST=0.0.0.0
+  ```
+</ParamField>
+
+<ParamField path="APP_KEY" type="string" required>
+  Secret key for encryption, sessions, and CSRF tokens. Generate with `node ace generate:key`.
+  
+  ```env
+  APP_KEY=your-generated-key-here
+  ```
+  
+  <Warning>
+    Must be unique per application and kept secret. Never share or commit this value.
+  </Warning>
+</ParamField>
+
+<ParamField path="LOG_LEVEL" type="string" default="info">
+  Logging verbosity level.
+  
+  <Expandable title="Levels">
+    - `trace` - Most verbose
+    - `debug` - Debug information
+    - `info` - General information (default)
+    - `warn` - Warnings
+    - `error` - Errors only
+    - `fatal` - Fatal errors only
+  </Expandable>
+  
+  ```env
+  # Development
+  LOG_LEVEL=debug
+  
+  # Production
+  LOG_LEVEL=info
+  ```
+</ParamField>
+
+<ParamField path="TZ" type="string" default="UTC">
+  Application timezone. Affects date/time operations.
+  
+  ```env
+  TZ=UTC
+  # or
+  TZ=America/New_York
+  ```
+</ParamField>
+
+### Session Configuration
+
+<ParamField path="SESSION_DRIVER" type="string" default="cookie" required>
+  Session storage driver.
+  
+  <Expandable title="Options">
+    - `cookie` - Store sessions in encrypted cookies (default)
+    - `memory` - In-memory storage (development only)
+    - `redis` - Redis-backed sessions (recommended for production)
+    - `database` - Database-backed sessions
+  </Expandable>
+  
+  ```env
+  SESSION_DRIVER=cookie
+  ```
+</ParamField>
+
+## Database Configuration
+
+### PostgreSQL Settings
+
+<ParamField path="DB_HOST" type="string" default="127.0.0.1" required>
+  PostgreSQL server hostname or IP address.
+  
+  ```env
+  # Local development
+  DB_HOST=127.0.0.1
+  
+  # Docker
+  DB_HOST=pgsql
+  
+  # Remote server
+  DB_HOST=db.example.com
+  ```
+</ParamField>
+
+<ParamField path="DB_PORT" type="number" default="5432" required>
+  PostgreSQL server port.
+  
+  ```env
+  DB_PORT=5432
+  ```
+</ParamField>
+
+<ParamField path="DB_USER" type="string" default="root" required>
+  Database username.
+  
+  ```env
+  DB_USER=root
+  ```
+</ParamField>
+
+<ParamField path="DB_PASSWORD" type="string" default="root" required>
+  Database password.
+  
+  ```env
+  DB_PASSWORD=root
+  ```
+  
+  <Warning>
+    Use strong passwords in production. Consider using secrets management.
+  </Warning>
+</ParamField>
+
+<ParamField path="DB_DATABASE" type="string" default="app" required>
+  Database name.
+  
+  ```env
+  DB_DATABASE=app
+  ```
+</ParamField>
+
+### Connection String Alternative
+
+You can also use a connection string:
+
+```env
+DATABASE_URL=postgresql://user:password@host:port/database?ssl=true
+```
+
+<Tip>
+  Connection strings are useful for cloud providers like Railway, Render, or Heroku.
+</Tip>
+
+## Email Configuration
+
+The starter kit supports two email methods:
+
+### Resend (Recommended for Production)
+
+<ParamField path="RESEND_API_KEY" type="string">
+  API key from [Resend](https://resend.com).
+  
+  ```env
+  RESEND_API_KEY=re_123456789
+  ```
+</ParamField>
+
+<ParamField path="EMAIL_FROM" type="string" required>
+  Default "from" email address.
+  
+  ```env
+  EMAIL_FROM=admin@repo.com
+  ```
+</ParamField>
+
+### SMTP (Development with Mailpit)
+
+<ParamField path="SMTP_HOST" type="string" default="localhost">
+  SMTP server hostname.
+  
+  ```env
+  # Mailpit (development)
+  SMTP_HOST=localhost
+  
+  # Production SMTP
+  SMTP_HOST=smtp.gmail.com
+  ```
+</ParamField>
+
+<ParamField path="SMTP_PORT" type="number" default="1025">
+  SMTP server port.
+  
+  ```env
+  # Mailpit
+  SMTP_PORT=1025
+  
+  # Gmail
+  SMTP_PORT=587
+  ```
+</ParamField>
+
+<ParamField path="SMTP_USERNAME" type="string">
+  SMTP authentication username.
+  
+  ```env
+  SMTP_USERNAME=user@host.com
+  ```
+</ParamField>
+
+<ParamField path="SMTP_PASSWORD" type="string">
+  SMTP authentication password.
+  
+  ```env
+  SMTP_PASSWORD=your-password
+  ```
+</ParamField>
+
+<ParamField path="SMTP_SECURE" type="number" default="0">
+  Use TLS/SSL for SMTP connection.
+  
+  ```env
+  # Disabled (Mailpit)
+  SMTP_SECURE=0
+  
+  # Enabled (production)
+  SMTP_SECURE=1
+  ```
+</ParamField>
+
+<ParamField path="SMTP_REJECTUNAUTHORIZED" type="boolean" default="false">
+  Reject unauthorized certificates.
+  
+  ```env
+  # Development
+  SMTP_REJECTUNAUTHORIZED=false
+  
+  # Production
+  SMTP_REJECTUNAUTHORIZED=true
+  ```
+</ParamField>
+
+### Email Configuration Examples
+
+<Tabs>
+  <Tab title="Mailpit (Development)">
+    ```env
+    SMTP_HOST=localhost
+    SMTP_PORT=1025
+    SMTP_USERNAME=user@host.com
+    SMTP_PASSWORD=XXX
+    SMTP_SECURE=0
+    SMTP_REJECTUNAUTHORIZED=false
+    EMAIL_FROM=admin@repo.com
+    ```
+  </Tab>
+  <Tab title="Resend (Production)">
+    ```env
+    RESEND_API_KEY=re_your_api_key_here
+    EMAIL_FROM=noreply@yourdomain.com
+    ```
+  </Tab>
+  <Tab title="Gmail SMTP">
+    ```env
+    SMTP_HOST=smtp.gmail.com
+    SMTP_PORT=587
+    SMTP_USERNAME=your-email@gmail.com
+    SMTP_PASSWORD=your-app-password
+    SMTP_SECURE=1
+    SMTP_REJECTUNAUTHORIZED=true
+    EMAIL_FROM=your-email@gmail.com
+    ```
+  </Tab>
+</Tabs>
+
+## OAuth Configuration
+
+### Google OAuth
+
+<ParamField path="GOOGLE_CLIENT_ID" type="string">
+  Google OAuth 2.0 client ID from [Google Cloud Console](https://console.cloud.google.com).
+  
+  ```env
+  GOOGLE_CLIENT_ID=123456789-abc.apps.googleusercontent.com
+  ```
+</ParamField>
+
+<ParamField path="GOOGLE_CLIENT_SECRET" type="string">
+  Google OAuth 2.0 client secret.
+  
+  ```env
+  GOOGLE_CLIENT_SECRET=your-secret-here
+  ```
+</ParamField>
+
+<Steps>
+  <Step title="Create OAuth App">
+    1. Go to [Google Cloud Console](https://console.cloud.google.com)
+    2. Create a new project or select existing
+    3. Enable Google+ API
+    4. Create OAuth 2.0 credentials
+  </Step>
+
+  <Step title="Configure Redirect URIs">
+    Add authorized redirect URIs:
+    ```
+    http://localhost:3333/auth/google/callback
+    https://yourdomain.com/auth/google/callback
+    ```
+  </Step>
+
+  <Step title="Copy Credentials">
+    Copy the Client ID and Client Secret to your `.env` file.
+  </Step>
+</Steps>
+
+## Storage Configuration
+
+<ParamField path="DRIVE_DISK" type="string" default="fs">
+  Default storage disk driver.
+  
+  <Expandable title="Options">
+    - `fs` - Local filesystem storage
+    - `s3` - Amazon S3 compatible storage
+    - `gcs` - Google Cloud Storage
+  </Expandable>
+  
+  ```env
+  # Development
+  DRIVE_DISK=fs
+  
+  # Production
+  DRIVE_DISK=s3
+  ```
+</ParamField>
+
+### S3 Configuration (Optional)
+
+For cloud storage:
+
+```env
+S3_KEY=your-access-key
+S3_SECRET=your-secret-key
+S3_BUCKET=your-bucket-name
+S3_REGION=us-east-1
+S3_ENDPOINT=https://s3.amazonaws.com
+```
+
+## Rate Limiting
+
+<ParamField path="LIMITER_STORE" type="string" default="database">
+  Storage backend for rate limiting.
+  
+  <Expandable title="Options">
+    - `memory` - In-memory storage (single server only)
+    - `database` - Database-backed (recommended)
+    - `redis` - Redis-backed (best for multi-server)
+  </Expandable>
+  
+  ```env
+  LIMITER_STORE=database
+  ```
+</ParamField>
+
+## Frontend Configuration
+
+<ParamField path="VITE_API_URL" type="string" default="http://localhost:3333">
+  API URL for frontend requests. Used by Vite during development.
+  
+  ```env
+  # Development
+  VITE_API_URL=http://localhost:3333
+  
+  # Production
+  VITE_API_URL=https://api.yourdomain.com
+  ```
+</ParamField>
+
+## Docker Compose Variables
+
+### Project Configuration
+
+<ParamField path="COMPOSE_PROJECT_NAME" type="string">
+  Docker Compose project name. Prefixes all container names.
+  
+  ```env
+  COMPOSE_PROJECT_NAME=myapp
+  ```
+  
+  Results in containers like:
+  - `myapp_web`
+  - `myapp_pgsql`
+  - `myapp_pgadmin`
+</ParamField>
+
+### PgAdmin Configuration
+
+<ParamField path="PGADMIN_MAIL" type="string" default="admin@repo.com">
+  PgAdmin login email.
+  
+  ```env
+  PGADMIN_MAIL=admin@repo.com
+  ```
+</ParamField>
+
+<ParamField path="PGADMIN_PW" type="string" default="secret">
+  PgAdmin login password.
+  
+  ```env
+  PGADMIN_PW=secret
+  ```
+</ParamField>
+
+## Environment Templates
+
+### Development Environment
+
+```env
+# Application
+TZ=UTC
+PORT=3333
+HOST=localhost
+LOG_LEVEL=debug
+DRIVE_DISK=fs
+APP_KEY=generate-with-ace-command
+NODE_ENV=development
+SESSION_DRIVER=cookie
+
+# Database (Docker)
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_USER=root
+DB_PASSWORD=root
+DB_DATABASE=app
+
+# Email (Mailpit)
+SMTP_HOST=localhost
+SMTP_PORT=1025
+SMTP_USERNAME=user@host.com
+SMTP_PASSWORD=XXX
+SMTP_SECURE=0
+SMTP_REJECTUNAUTHORIZED=false
+EMAIL_FROM=admin@repo.com
+
+# OAuth
+GOOGLE_CLIENT_ID=<your-key>
+GOOGLE_CLIENT_SECRET=<your-key>
+
+# Frontend
+VITE_API_URL=http://localhost:3333
+
+# Rate Limiting
+LIMITER_STORE=database
+
+# Docker Compose
+COMPOSE_PROJECT_NAME=adonisjs
+PGADMIN_MAIL=admin@repo.com
+PGADMIN_PW=secret
+```
+
+### Production Environment
+
+```env
+# Application
+TZ=UTC
+PORT=3333
+HOST=0.0.0.0
+LOG_LEVEL=info
+DRIVE_DISK=s3
+APP_KEY=your-production-key-here
+NODE_ENV=production
+SESSION_DRIVER=redis
+
+# Database
+DB_HOST=your-db-host.com
+DB_PORT=5432
+DB_USER=production_user
+DB_PASSWORD=strong-secure-password
+DB_DATABASE=production_app
+
+# Email (Resend)
+RESEND_API_KEY=re_your_api_key
+EMAIL_FROM=noreply@yourdomain.com
+
+# OAuth
+GOOGLE_CLIENT_ID=your-production-client-id
+GOOGLE_CLIENT_SECRET=your-production-secret
+
+# Frontend
+VITE_API_URL=https://api.yourdomain.com
+
+# Rate Limiting
+LIMITER_STORE=redis
+
+# S3 Storage
+S3_KEY=your-access-key
+S3_SECRET=your-secret-key
+S3_BUCKET=your-bucket
+S3_REGION=us-east-1
+
+# Redis
+REDIS_HOST=your-redis-host.com
+REDIS_PORT=6379
+REDIS_PASSWORD=redis-password
+```
+
+## Security Best Practices
+
+<AccordionGroup>
+  <Accordion title="Never commit .env files">
+    Add to `.gitignore`:
+    ```gitignore
+    .env
+    .env.local
+    .env.production
+    .env.*.local
+    ```
+  </Accordion>
+
+  <Accordion title="Use strong APP_KEY">
+    Generate cryptographically secure keys:
+    ```bash
+    node ace generate:key
+    ```
+    Never reuse keys across environments.
+  </Accordion>
+
+  <Accordion title="Rotate credentials regularly">
+    - Change database passwords periodically
+    - Rotate API keys every 90 days
+    - Update OAuth secrets when compromised
+  </Accordion>
+
+  <Accordion title="Use secrets management in production">
+    Consider using:
+    - AWS Secrets Manager
+    - HashiCorp Vault
+    - Azure Key Vault
+    - Google Secret Manager
+    - Railway/Render environment variables
+  </Accordion>
+
+  <Accordion title="Restrict access to .env files">
+    ```bash
+    chmod 600 .env
+    ```
+    Only the application user should have read access.
+  </Accordion>
+</AccordionGroup>
+
+## Environment Validation
+
+AdonisJS validates environment variables on startup. Missing required variables will cause the application to fail with clear error messages.
+
+### Manual Validation
+
+Test your environment configuration:
+
+```bash
+# Check database connection
+node ace db:check
+
+# List all routes (validates app startup)
+node ace list:routes
+
+# Run migrations
+node ace migration:run
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="APP_KEY is missing">
+    Generate a new key:
+    ```bash
+    node ace generate:key
+    ```
+    Copy the output to your `.env` file:
+    ```env
+    APP_KEY=generated-key-here
+    ```
+  </Accordion>
+
+  <Accordion title="Database connection fails">
+    1. Verify PostgreSQL is running:
+       ```bash
+       docker compose ps pgsql
+       ```
+    2. Check credentials match `.env`
+    3. Test connection:
+       ```bash
+       psql -h 127.0.0.1 -U root -d app
+       ```
+  </Accordion>
+
+  <Accordion title="Environment variables not loading">
+    1. Ensure `.env` file is in the correct directory (`apps/web/`)
+    2. Restart the application
+    3. Check file permissions:
+       ```bash
+       ls -la apps/web/.env
+       ```
+  </Accordion>
+
+  <Accordion title="Email sending fails">
+    1. Verify SMTP settings:
+       ```bash
+       # Test with Mailpit
+       curl http://localhost:8025
+       ```
+    2. Check Mailpit is running:
+       ```bash
+       docker compose ps mailpit
+       ```
+    3. Review email logs in Mailpit UI
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Docker Setup" icon="docker" href="/deployment/docker">
+    Configure Docker for development
+  </Card>
+  <Card title="Production Deployment" icon="rocket" href="/deployment/production">
+    Deploy to production servers
+  </Card>
+</CardGroup>

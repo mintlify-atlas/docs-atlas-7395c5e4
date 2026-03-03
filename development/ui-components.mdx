@@ -1,0 +1,519 @@
+---
+title: UI Components
+description: Work with ShadCN UI components and build your component library in the AdonisJS Starter Kit
+---
+
+The AdonisJS Starter Kit uses **ShadCN UI** - a collection of beautifully designed, accessible components built with Radix UI and Tailwind CSS.
+
+## Overview
+
+ShadCN UI components are located in the `packages/ui` workspace:
+
+```
+packages/ui/
+├── src/
+│   ├── components/          # UI components
+│   │   ├── button.tsx
+│   │   ├── card.tsx
+│   │   ├── input.tsx
+│   │   └── ...
+│   ├── hooks/              # Shared hooks
+│   ├── lib/                # Utilities
+│   │   └── utils.ts        # cn() helper
+│   └── styles/
+│       └── globals.css     # Global styles
+├── components.json         # ShadCN config
+└── package.json
+```
+
+<Note>
+  Components are in a separate workspace package (`@workspace/ui`) and can be used across multiple apps.
+</Note>
+
+## Using Components
+
+Import components from the `@workspace/ui` package:
+
+```tsx
+import { Button } from '@workspace/ui/components/button'
+import { Card, CardHeader, CardTitle, CardContent } from '@workspace/ui/components/card'
+import { Input } from '@workspace/ui/components/input'
+
+function MyComponent() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Welcome</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Input placeholder="Enter your email" />
+        <Button>Submit</Button>
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+## Available Components
+
+The starter kit includes the following ShadCN components:
+
+<CardGroup cols={3}>
+  <Card title="Button" icon="hand-pointer">
+    Multiple variants and sizes
+  </Card>
+  <Card title="Card" icon="id-card">
+    Container with header and content
+  </Card>
+  <Card title="Input" icon="keyboard">
+    Text input with variants
+  </Card>
+  <Card title="Textarea" icon="align-left">
+    Multi-line text input
+  </Card>
+  <Card title="Select" icon="list">
+    Dropdown selection
+  </Card>
+  <Card title="Dialog" icon="window-maximize">
+    Modal dialogs
+  </Card>
+  <Card title="Sheet" icon="sidebar">
+    Side panels and drawers
+  </Card>
+  <Card title="Table" icon="table">
+    Data tables with sorting
+  </Card>
+  <Card title="Dropdown Menu" icon="bars">
+    Context menus
+  </Card>
+  <Card title="Tooltip" icon="circle-info">
+    Hover tooltips
+  </Card>
+  <Card title="Alert" icon="triangle-exclamation">
+    Alert messages
+  </Card>
+  <Card title="Badge" icon="tag">
+    Status badges
+  </Card>
+  <Card title="Avatar" icon="user-circle">
+    User avatars
+  </Card>
+  <Card title="Checkbox" icon="check-square">
+    Checkbox inputs
+  </Card>
+  <Card title="Radio Group" icon="circle-dot">
+    Radio button groups
+  </Card>
+  <Card title="Progress" icon="bars-progress">
+    Progress bars
+  </Card>
+  <Card title="Skeleton" icon="spinner">
+    Loading skeletons
+  </Card>
+  <Card title="Toast" icon="bell">
+    Toast notifications (Sonner)
+  </Card>
+</CardGroup>
+
+## Component Examples
+
+### Button Component
+
+The Button component supports multiple variants and sizes:
+
+```tsx
+import { Button } from '@workspace/ui/components/button'
+
+// Variants
+<Button variant="default">Default</Button>
+<Button variant="destructive">Delete</Button>
+<Button variant="outline">Outline</Button>
+<Button variant="secondary">Secondary</Button>
+<Button variant="ghost">Ghost</Button>
+<Button variant="link">Link</Button>
+
+// Sizes
+<Button size="default">Default</Button>
+<Button size="sm">Small</Button>
+<Button size="lg">Large</Button>
+<Button size="icon"><Icon /></Button>
+```
+
+<Tip>
+  The `asChild` prop allows you to render the button as a different element (like `Link`) while keeping button styles.
+</Tip>
+
+### Card Component
+
+The Card component is perfect for grouping related content:
+
+```tsx
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+  CardAction,
+} from '@workspace/ui/components/card'
+
+function UserCard() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>User Profile</CardTitle>
+        <CardDescription>Manage your account settings</CardDescription>
+        <CardAction>
+          <Button variant="ghost" size="icon-sm">
+            <MoreIcon />
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        <p>Your profile information goes here</p>
+      </CardContent>
+      <CardFooter>
+        <Button>Save Changes</Button>
+      </CardFooter>
+    </Card>
+  )
+}
+```
+
+### Form Components
+
+The starter kit includes custom form components with built-in error handling:
+
+```tsx
+import { Input } from '@workspace/ui/components/input'
+import { PasswordInput } from '@workspace/ui/components/password-input'
+import {
+  FieldSet,
+  FieldGroup,
+  Field,
+  FieldLabel,
+  FieldError,
+  FieldSeparator,
+} from '@workspace/ui/components/field'
+import { FieldErrorBag } from '@workspace/ui/components/field-error-bag'
+
+function MyForm({ errors }) {
+  return (
+    <FieldSet>
+      <FieldGroup>
+        <Field>
+          <FieldLabel htmlFor="email">Email</FieldLabel>
+          <Input
+            id="email"
+            type="email"
+            placeholder="m@example.com"
+          />
+          <FieldErrorBag errors={errors} field="email" />
+        </Field>
+        
+        <Field>
+          <FieldLabel htmlFor="password">Password</FieldLabel>
+          <PasswordInput id="password" />
+          <FieldErrorBag errors={errors} field="password" />
+        </Field>
+        
+        <FieldSeparator>OR</FieldSeparator>
+        
+        <Field orientation="responsive">
+          <Button type="submit">Submit</Button>
+        </Field>
+      </FieldGroup>
+    </FieldSet>
+  )
+}
+```
+
+### Data Table Component
+
+The starter kit includes a powerful DataTable component built with TanStack Table:
+
+```tsx
+import { DataTable } from '@workspace/ui/components/data-table'
+import { useDataTable } from '@workspace/ui/hooks/use-data-table'
+
+const columns = [
+  {
+    accessorKey: 'name',
+    header: 'Name',
+  },
+  {
+    accessorKey: 'email',
+    header: 'Email',
+  },
+]
+
+function UsersTable({ data }) {
+  const table = useDataTable({
+    data,
+    columns,
+  })
+  
+  return <DataTable table={table} />
+}
+```
+
+## Adding New Components
+
+The starter kit uses ShadCN's CLI to add new components.
+
+<Steps>
+  <Step title="Navigate to UI package">
+    ```bash
+    cd packages/ui
+    ```
+  </Step>
+  
+  <Step title="Add component using npx">
+    ```bash
+    npx shadcn@latest add [component-name]
+    ```
+    
+    For example:
+    ```bash
+    npx shadcn@latest add accordion
+    npx shadcn@latest add tabs
+    npx shadcn@latest add calendar
+    ```
+  </Step>
+  
+  <Step title="Component is added automatically">
+    The component will be added to `packages/ui/src/components/` and you can start using it immediately:
+    
+    ```tsx
+    import { Accordion } from '@workspace/ui/components/accordion'
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  Always run the `shadcn` command from the `packages/ui` directory to ensure components are added to the correct location.
+</Note>
+
+## Component Configuration
+
+The ShadCN configuration is in `packages/ui/components.json`:
+
+```json packages/ui/components.json
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/styles/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@workspace/ui/components",
+    "utils": "@workspace/ui/lib/utils",
+    "hooks": "@workspace/ui/hooks",
+    "lib": "@workspace/ui/lib",
+    "ui": "@workspace/ui/components"
+  }
+}
+```
+
+## Customizing Components
+
+### Modifying Existing Components
+
+Since ShadCN components are copied into your project, you can modify them directly:
+
+```tsx packages/ui/src/components/button.tsx
+const buttonVariants = cva(
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        destructive: "bg-destructive text-white hover:bg-destructive/90",
+        outline: "border bg-background shadow-xs hover:bg-accent",
+        // Add your custom variant
+        custom: "bg-gradient-to-r from-purple-500 to-pink-500",
+      },
+      size: {
+        default: "h-9 px-4 py-2",
+        sm: "h-8 rounded-md gap-1.5 px-3",
+        lg: "h-10 rounded-md px-6",
+        // Add custom size
+        xl: "h-12 rounded-lg px-8 text-lg",
+      },
+    },
+  }
+)
+```
+
+### Creating Composite Components
+
+Build higher-level components from primitives:
+
+```tsx app/common/ui/components/user_avatar.tsx
+import { Avatar, AvatarImage, AvatarFallback } from '@workspace/ui/components/avatar'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@workspace/ui/components/tooltip'
+
+interface UserAvatarProps {
+  user: {
+    fullName: string
+    avatarUrl?: string
+  }
+  showTooltip?: boolean
+}
+
+export function UserAvatar({ user, showTooltip = true }: UserAvatarProps) {
+  const initials = user.fullName
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+  
+  const avatar = (
+    <Avatar>
+      {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.fullName} />}
+      <AvatarFallback>{initials}</AvatarFallback>
+    </Avatar>
+  )
+  
+  if (!showTooltip) return avatar
+  
+  return (
+    <Tooltip>
+      <TooltipTrigger>{avatar}</TooltipTrigger>
+      <TooltipContent>{user.fullName}</TooltipContent>
+    </Tooltip>
+  )
+}
+```
+
+## Theming
+
+The starter kit uses CSS variables for theming:
+
+```css packages/ui/src/styles/globals.css
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+    /* ... more variables */
+  }
+  
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    /* ... more variables */
+  }
+}
+```
+
+<Tip>
+  The starter kit includes a theme switcher. Use the `next-themes` package via `ThemeProvider` for dark mode support.
+</Tip>
+
+## Utility Functions
+
+### cn() Helper
+
+The `cn()` utility combines Tailwind classes with class variance authority:
+
+```tsx
+import { cn } from '@workspace/ui/lib/utils'
+
+function MyComponent({ className, isActive }) {
+  return (
+    <div className={cn(
+      "base-class",
+      isActive && "active-class",
+      className
+    )}>
+      Content
+    </div>
+  )
+}
+```
+
+## Icons
+
+The starter kit uses Lucide React for icons:
+
+```tsx
+import { Mail, Lock, User, Settings } from 'lucide-react'
+
+function MyComponent() {
+  return (
+    <div>
+      <Mail className="size-4" />
+      <Lock className="size-6 text-red-500" />
+      <User />
+      <Settings className="animate-spin" />
+    </div>
+  )
+}
+```
+
+<Note>
+  Browse all available icons at [lucide.dev](https://lucide.dev)
+</Note>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use semantic component names">
+    Create wrapper components with domain-specific names:
+    ```tsx
+    // Good
+    <UserActionButton onClick={deleteUser}>
+      Delete User
+    </UserActionButton>
+    
+    // Instead of
+    <Button variant="destructive" onClick={deleteUser}>
+      Delete User
+    </Button>
+    ```
+  </Accordion>
+
+  <Accordion title="Keep components accessible">
+    ShadCN components are built with Radix UI and are accessible by default. Maintain this by:
+    - Using proper ARIA labels
+    - Including keyboard navigation
+    - Testing with screen readers
+  </Accordion>
+
+  <Accordion title="Compose, don't modify">
+    Instead of modifying base components, create new composite components:
+    ```tsx
+    // Create a specialized button
+    export function DangerButton(props) {
+      return <Button variant="destructive" {...props} />
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Use the design system">
+    Stick to the predefined variants and sizes to maintain consistency across your app.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Frontend Development" icon="react" href="/development/frontend">
+    Learn about React and Inertia.js integration
+  </Card>
+  
+  <Card title="ShadCN UI Docs" icon="book" href="https://ui.shadcn.com">
+    Browse the official ShadCN documentation
+  </Card>
+</CardGroup>

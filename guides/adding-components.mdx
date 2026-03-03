@@ -1,0 +1,283 @@
+---
+title: Adding ShadCN Components
+description: Learn how to add new ShadCN UI components to your AdonisJS Starter Kit
+---
+
+The AdonisJS Starter Kit uses [ShadCN UI](https://ui.shadcn.com/) for its component library. ShadCN provides beautifully designed, accessible, and customizable components that you can add to your project.
+
+## Prerequisites
+
+The starter kit comes pre-configured with ShadCN. The configuration is stored in `packages/ui/components.json`:
+
+```json packages/ui/components.json
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/styles/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@workspace/ui/components",
+    "utils": "@workspace/ui/lib/utils",
+    "hooks": "@workspace/ui/hooks",
+    "lib": "@workspace/ui/lib",
+    "ui": "@workspace/ui/components"
+  }
+}
+```
+
+## Adding a Component
+
+<Steps>
+  <Step title="Choose a component">
+    Browse the [ShadCN UI component library](https://ui.shadcn.com/docs/components) to find the component you want to add.
+
+    Popular components include:
+    - Button
+    - Input
+    - Dialog
+    - Dropdown Menu
+    - Tabs
+    - Toast
+    - Form
+  </Step>
+
+  <Step title="Run the add command">
+    Use the ShadCN CLI to add the component. The `-c` flag specifies the app directory:
+
+    ```bash
+    pnpm dlx shadcn@latest add button -c apps/web
+    ```
+
+    Replace `button` with the name of any component you want to add.
+
+    <Tip>
+      You can add multiple components at once:
+      
+      ```bash
+      pnpm dlx shadcn@latest add button input dialog -c apps/web
+      ```
+    </Tip>
+  </Step>
+
+  <Step title="Verify installation">
+    The component will be installed in the `packages/ui/components` directory. You can verify by checking:
+
+    ```bash
+    ls packages/ui/components/ui/
+    ```
+  </Step>
+</Steps>
+
+## Using Components
+
+Once installed, you can import and use components in your React pages:
+
+```tsx app/users/ui/pages/example.tsx
+import { Button } from '@workspace/ui/components/ui/button'
+import { Input } from '@workspace/ui/components/ui/input'
+
+export default function Example() {
+  return (
+    <div>
+      <Input placeholder="Enter your email" />
+      <Button>Submit</Button>
+    </div>
+  )
+}
+```
+
+## Component Customization
+
+<Steps>
+  <Step title="Customize styles">
+    All ShadCN components use Tailwind CSS classes. You can customize them by modifying the component files in `packages/ui/components/ui/`.
+
+    ```tsx
+    <Button className="bg-blue-500 hover:bg-blue-600">
+      Custom Button
+    </Button>
+    ```
+  </Step>
+
+  <Step title="Modify component defaults">
+    Each component file can be edited directly to change default behavior or styles:
+
+    ```tsx packages/ui/components/ui/button.tsx
+    const buttonVariants = cva(
+      "inline-flex items-center justify-center rounded-md text-sm font-medium",
+      {
+        variants: {
+          variant: {
+            default: "bg-primary text-primary-foreground hover:bg-primary/90",
+            // Add your custom variants here
+            custom: "bg-purple-500 text-white hover:bg-purple-600",
+          },
+        },
+      }
+    )
+    ```
+  </Step>
+
+  <Step title="Use theme variables">
+    ShadCN uses CSS variables for theming. Modify them in your global CSS:
+
+    ```css packages/ui/src/styles/globals.css
+    :root {
+      --primary: 222.2 47.4% 11.2%;
+      --primary-foreground: 210 40% 98%;
+      /* Add or modify theme variables */
+    }
+    ```
+  </Step>
+</Steps>
+
+## Working with Forms
+
+ShadCN form components work seamlessly with AdonisJS validation:
+
+<Steps>
+  <Step title="Add form components">
+    ```bash
+    pnpm dlx shadcn@latest add form input label -c apps/web
+    ```
+  </Step>
+
+  <Step title="Create a form">
+    ```tsx
+    import { useForm } from '@inertiajs/react'
+    import { Button } from '@workspace/ui/components/ui/button'
+    import { Input } from '@workspace/ui/components/ui/input'
+    import { Label } from '@workspace/ui/components/ui/label'
+
+    export default function LoginForm() {
+      const { data, setData, post, processing, errors } = useForm({
+        email: '',
+        password: '',
+      })
+
+      function submit(e: React.FormEvent) {
+        e.preventDefault()
+        post('/login')
+      }
+
+      return (
+        <form onSubmit={submit}>
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={data.email}
+              onChange={(e) => setData('email', e.target.value)}
+            />
+            {errors.email && <span>{errors.email}</span>}
+          </div>
+
+          <div>
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              value={data.password}
+              onChange={(e) => setData('password', e.target.value)}
+            />
+            {errors.password && <span>{errors.password}</span>}
+          </div>
+
+          <Button type="submit" disabled={processing}>
+            Log in
+          </Button>
+        </form>
+      )
+    }
+    ```
+  </Step>
+</Steps>
+
+## Useful Component Combinations
+
+<AccordionGroup>
+  <Accordion title="Data Tables">
+    ```bash
+    pnpm dlx shadcn@latest add table dropdown-menu checkbox -c apps/web
+    ```
+    
+    Perfect for displaying user lists, data grids, and admin panels.
+  </Accordion>
+
+  <Accordion title="Modal Dialogs">
+    ```bash
+    pnpm dlx shadcn@latest add dialog button -c apps/web
+    ```
+    
+    Great for confirmations, forms, and user interactions.
+  </Accordion>
+
+  <Accordion title="Navigation">
+    ```bash
+    pnpm dlx shadcn@latest add navigation-menu dropdown-menu -c apps/web
+    ```
+    
+    Build complex navigation menus and dropdowns.
+  </Accordion>
+
+  <Accordion title="Notifications">
+    ```bash
+    pnpm dlx shadcn@latest add toast alert -c apps/web
+    ```
+    
+    Show success messages, errors, and alerts to users.
+  </Accordion>
+</AccordionGroup>
+
+## Theme Configuration
+
+The starter kit uses the **New York** style with the **Neutral** base color. You can change this by modifying `packages/ui/components.json`:
+
+```json
+{
+  "style": "new-york",  // or "default"
+  "tailwind": {
+    "baseColor": "neutral"  // or "slate", "gray", "zinc", "stone"
+  }
+}
+```
+
+## Icon Library
+
+The starter kit uses [Lucide Icons](https://lucide.dev/):
+
+```tsx
+import { Mail, Lock, User } from 'lucide-react'
+
+<Mail className="w-4 h-4" />
+<Lock className="w-5 h-5 text-gray-500" />
+<User size={24} />
+```
+
+## Resources
+
+<CardGroup cols={2}>
+  <Card title="ShadCN Documentation" icon="book" href="https://ui.shadcn.com/docs">
+    Official ShadCN UI documentation
+  </Card>
+  
+  <Card title="Component Examples" icon="grid" href="https://ui.shadcn.com/docs/components">
+    Browse all available components
+  </Card>
+  
+  <Card title="ShadCN Blocks" icon="blocks" href="https://www.shadcnblocks.com/">
+    Pre-built component compositions
+  </Card>
+  
+  <Card title="Lucide Icons" icon="icons" href="https://lucide.dev/">
+    Complete icon library
+  </Card>
+</CardGroup>

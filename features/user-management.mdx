@@ -1,0 +1,341 @@
+---
+title: User Management
+description: Comprehensive user administration with roles, profiles, and permissions
+icon: users
+---
+
+## Overview
+
+The starter kit includes a complete user management system for administrators to create, edit, delete, and manage users. It features role assignment, profile management, user search, and filtering capabilities.
+
+## User List & Search
+
+Administrators can view and manage all users with powerful search and filtering:
+
+```typescript app/users/controllers/users_controller.ts
+import type { HttpContext } from '@adonisjs/core/http'
+import User from '#users/models/user'
+import UserDto from '#users/dtos/user'
+import UserPolicy from '#users/policies/user_policy'
+
+export default class UsersController {
+  public async index({ bouncer, inertia, request }: HttpContext) {
+    await bouncer.with(UserPolicy).authorize('viewList')
+
+    const payload = await request.validateUsing(listUserValidator)
+
+    const limit = payload.perPage || 10
+    const page = payload.page || 1
+    const querySearch = payload.q || undefined
+    const roleIds = payload.roleIds || []
+
+    const query = User.query()
+
+    // Search by name or email
+    if (querySearch) {
+      query.where((subquery) => {
+        subquery
+          .where('full_name', 'ilike', `%${querySearch}%`)
+          .orWhere('email', 'ilike', `%${querySearch}%`)
+      })
+    }
+
+    // Filter by roles
+    if (Array.isArray(roleIds) && roleIds.length > 0) {
+      query.andWhereIn('role_id', roleIds)
+    }
+
+    const users = await query.preload('role').paginate(page, limit)
+    await User.preComputeUrls(users)
+
+    return inertia.render('users/index', {
+      users: UserDto.fromPaginator(users),
+      q: querySearch,
+      selectedRoles: roleIds,
+    })
+  }
+}
+```
+
+<Info>
+**Authorization**: Only administrators can access the user list. Authorization is enforced using Bouncer policies.
+</Info>
+
+## Creating Users
+
+Administrators can create new users with assigned roles:
+
+```typescript app/users/controllers/users_controller.ts
+public async store({ bouncer, request, response }: HttpContext) {
+  await bouncer.with(UserPolicy).authorize('create')
+
+  const payload = await request.validateUsing(createUserValidator)
+
+  const user = new User()
+  user.merge({
+    ...payload,
+    password: payload.password ? payload.password : cuid(),
+  })
+
+  await user.save()
+
+  return response.redirect().toRoute('users.index')
+}
+```
+
+<Note>
+If no password is provided, a random CUID is generated. Users can then use the password reset flow to set their own password.
+</Note>
+
+## Updating Users
+
+Users can update their own profiles, and administrators can update any user:
+
+```typescript app/users/controllers/users_controller.ts
+public async update({ bouncer, params, request, response }: HttpContext) {
+  const user = await User.findOrFail(params.id)
+
+  await bouncer.with(UserPolicy).authorize('update', user)
+
+  const payload = await request.validateUsing(editUserValidator, { 
+    meta: { userId: params.id } 
+  })
+  
+  user.merge({
+    ...payload,
+    password: payload.password ? payload.password : user.password,
+  })
+
+  await user.save()
+
+  return response.redirect().toRoute('users.index')
+}
+```
+
+## Deleting Users
+
+Administrators can delete users (except themselves):
+
+```typescript app/users/controllers/users_controller.ts
+public async destroy({ bouncer, params, response }: HttpContext) {
+  const user = await User.findOrFail(params.id)
+
+  await bouncer.with(UserPolicy).authorize('delete', user)
+
+  await user.delete()
+
+  return response.redirect().toRoute('users.index')
+}
+```
+
+## Profile Management
+
+Users can manage their own profiles including avatar uploads:
+
+```typescript app/users/controllers/profile_controller.ts
+import type { HttpContext } from '@adonisjs/core/http'
+import { attachmentManager } from '@jrmc/adonis-attachment'
+import User from '#users/models/user'
+
+export default class ProfileController {
+  public async show({ auth, inertia }: HttpContext) {
+    await User.preComputeUrls(auth.user!)
+
+    return inertia.render('users/profile', {
+      profile: new UserDto(auth.user),
+    })
+  }
+
+  public async handle({ auth, request, response }: HttpContext) {
+    const { avatar, ...payload } = await request.validateUsing(updateProfileValidator)
+
+    const user = await User.findOrFail(auth.user!.id)
+
+    if (avatar) {
+      user.avatar = await attachmentManager.createFromFile(avatar)
+    }
+
+    user.merge({ ...payload })
+    await user.save()
+
+    return response.redirect().toRoute('profile.show')
+  }
+}
+```
+
+## User Roles
+
+The starter kit includes a role-based system:
+
+```typescript app/users/enums/role.ts
+enum Roles {
+  USER = 1,
+  ADMIN = 2,
+}
+
+export const RoleWeights = [Roles.USER, Roles.ADMIN]
+
+export default Roles
+```
+
+```typescript app/users/models/role.ts
+import { DateTime } from 'luxon'
+import { column, hasMany } from '@adonisjs/lucid/orm'
+import User from '#users/models/user'
+import BaseModel from '#common/models/base_model'
+
+export default class Role extends BaseModel {
+  @column({ isPrimary: true })
+  declare id: number
+
+  @column()
+  declare name: string
+
+  @column()
+  declare description: string
+
+  @column.dateTime({ autoCreate: true })
+  declare createdAt: DateTime
+
+  @column.dateTime({ autoCreate: true, autoUpdate: true })
+  declare updatedAt: DateTime
+
+  @hasMany(() => User)
+  declare users: HasMany<typeof User>
+}
+```
+
+## User Policies
+
+Access control is enforced through Bouncer policies:
+
+```typescript app/users/policies/user_policy.ts
+import { BasePolicy } from '@adonisjs/bouncer'
+import { AuthorizerResponse } from '@adonisjs/bouncer/types'
+import User from '#users/models/user'
+
+export default class UserPolicy extends BasePolicy {
+  // Only admins can view user list
+  viewList(currentUser: User): AuthorizerResponse {
+    return currentUser.isAdmin
+  }
+
+  // Admins can view any user, users can view themselves
+  view(currentUser: User, user: User): AuthorizerResponse {
+    return currentUser.isAdmin || currentUser.id === user.id
+  }
+
+  // Only admins can create users
+  create(currentUser: User): AuthorizerResponse {
+    return currentUser.isAdmin
+  }
+
+  // Admins can update any user, users can update themselves
+  update(currentUser: User, user: User): AuthorizerResponse {
+    return currentUser.isAdmin || currentUser.id === user.id
+  }
+
+  // Admins can delete users (except themselves)
+  delete(currentUser: User, user: User): AuthorizerResponse {
+    return currentUser.isAdmin && currentUser.id !== user.id
+  }
+
+  // Only admins can invite users
+  invite(currentUser: User): AuthorizerResponse {
+    return currentUser.isAdmin
+  }
+}
+```
+
+## User Routes
+
+All user management routes:
+
+```typescript app/users/routes.ts
+import { middleware } from '#start/kernel'
+import router from '@adonisjs/core/services/router'
+
+// User Management (Admin only)
+router
+  .resource('/users', UsersController)
+  .only(['index', 'store', 'update', 'destroy'])
+  .use('*', middleware.auth())
+  .as('users')
+
+// User Invitations
+router.post('/users/invite', [InviteController])
+  .middleware(middleware.auth())
+
+// Profile Management
+router.get('/settings/profile', [ProfileController, 'show'])
+  .middleware(middleware.auth())
+  .as('profile.show')
+
+router.put('/settings/profile', [ProfileController])
+  .middleware(middleware.auth())
+
+// Password Management
+router.get('/settings/password', [PasswordController, 'show'])
+  .middleware(middleware.auth())
+  .as('password.show')
+
+router.put('/settings/password', [PasswordController])
+  .middleware(middleware.auth())
+```
+
+## Avatar Management
+
+Users can upload profile avatars with automatic thumbnail generation:
+
+```typescript app/users/models/user.ts
+import { attachment, attachmentManager } from '@jrmc/adonis-attachment'
+import type { Attachment } from '@jrmc/adonis-attachment/types/attachment'
+
+export default class User extends compose(BaseModel, AuthFinder) {
+  @attachment({ preComputeUrl: false, variants: ['thumbnail'] })
+  declare avatar: Attachment
+
+  @column()
+  declare avatarUrl: string | null
+
+  static async preComputeUrls(models: User | User[]) {
+    if (Array.isArray(models)) {
+      await Promise.all(models.map((model) => this.preComputeUrls(model)))
+      return
+    }
+
+    if (!models.avatar) return
+
+    const thumbnail = models.avatar.getVariant('thumbnail')
+    if (thumbnail) {
+      await attachmentManager.computeUrl(thumbnail)
+    }
+  }
+}
+```
+
+## User Invitations
+
+Administrators can invite users via email with role assignment. The invited users receive an email with instructions to set their password.
+
+<CardGroup cols={2}>
+  <Card title="Authorization" icon="shield-check" href="/features/authorization">
+    Learn about role-based access control
+  </Card>
+  <Card title="API Tokens" icon="key" href="/features/api-tokens">
+    Generate tokens for API access
+  </Card>
+</CardGroup>
+
+## Search & Filtering
+
+The user management interface supports:
+
+- **Full-text search**: Search by name or email
+- **Role filtering**: Filter users by assigned roles
+- **Pagination**: Navigate through large user lists
+- **Sorting**: Order users by various fields
+
+<Check>
+**Admin Tools**: The user management system provides all the tools administrators need to efficiently manage users at scale.
+</Check>

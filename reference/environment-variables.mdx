@@ -1,0 +1,182 @@
+---
+title: Environment Variables
+description: Complete reference for all environment variables used in the AdonisJS Starter Kit
+icon: key
+---
+
+This page documents all environment variables available in the AdonisJS Starter Kit. These variables are defined in `apps/web/.env.example` and should be configured in your `apps/web/.env` file.
+
+## Application Settings
+
+<ParamField path="APP_KEY" type="string" required>
+  Cryptographically secure key used for encryption and signing. Generate using `node ace generate:key`.
+</ParamField>
+
+<ParamField path="NODE_ENV" type="string" default="development">
+  Application environment. Set to `production` for production deployments.
+  
+  **Options:** `development`, `production`, `test`
+</ParamField>
+
+<ParamField path="TZ" type="string" default="UTC">
+  Timezone for the application. Used for date/time operations.
+</ParamField>
+
+<ParamField path="LOG_LEVEL" type="string" default="info">
+  Logging level for the application.
+  
+  **Options:** `trace`, `debug`, `info`, `warn`, `error`, `fatal`
+</ParamField>
+
+## Server Configuration
+
+<ParamField path="PORT" type="number" default="3333">
+  Port number on which the application server will listen.
+</ParamField>
+
+<ParamField path="HOST" type="string" default="localhost">
+  Hostname for the application server.
+</ParamField>
+
+## Session & Storage
+
+<ParamField path="SESSION_DRIVER" type="string" default="cookie">
+  Driver for session storage.
+  
+  **Options:** `cookie`, `file`, `redis`, `memory`
+</ParamField>
+
+<ParamField path="DRIVE_DISK" type="string" default="fs">
+  Default disk for file storage using AdonisJS Drive.
+  
+  **Options:** `fs` (filesystem), `s3`, `gcs`
+</ParamField>
+
+## Database Configuration
+
+<ParamField path="DB_HOST" type="string" default="127.0.0.1">
+  PostgreSQL database host address.
+</ParamField>
+
+<ParamField path="DB_PORT" type="number" default="5432">
+  PostgreSQL database port.
+</ParamField>
+
+<ParamField path="DB_USER" type="string" default="root">
+  PostgreSQL database username.
+</ParamField>
+
+<ParamField path="DB_PASSWORD" type="string" default="root">
+  PostgreSQL database password.
+</ParamField>
+
+<ParamField path="DB_DATABASE" type="string" default="app">
+  PostgreSQL database name.
+</ParamField>
+
+## Email Configuration
+
+### Resend (Recommended)
+
+<ParamField path="RESEND_API_KEY" type="string">
+  API key for Resend email service. Get your key from [resend.com](https://resend.com).
+</ParamField>
+
+<ParamField path="EMAIL_FROM" type="string" default="admin@repo.com">
+  Default sender email address for outgoing emails.
+</ParamField>
+
+### SMTP (Alternative)
+
+<ParamField path="SMTP_HOST" type="string" default="localhost">
+  SMTP server hostname. Use `localhost` with Mailpit for local development.
+</ParamField>
+
+<ParamField path="SMTP_PORT" type="number" default="1025">
+  SMTP server port. Mailpit uses port `1025` by default.
+</ParamField>
+
+<ParamField path="SMTP_USERNAME" type="string">
+  SMTP authentication username.
+</ParamField>
+
+<ParamField path="SMTP_PASSWORD" type="string">
+  SMTP authentication password.
+</ParamField>
+
+<ParamField path="SMTP_SECURE" type="boolean" default="0">
+  Enable TLS/SSL for SMTP connection.
+  
+  **Values:** `0` (disabled), `1` (enabled)
+</ParamField>
+
+<ParamField path="SMTP_REJECTUNAUTHORIZED" type="boolean" default="false">
+  Reject unauthorized SSL certificates.
+  
+  **Values:** `true`, `false`
+</ParamField>
+
+## Social Authentication
+
+### Google OAuth
+
+<ParamField path="GOOGLE_CLIENT_ID" type="string">
+  Google OAuth client ID. Get from [Google Cloud Console](https://console.cloud.google.com).
+</ParamField>
+
+<ParamField path="GOOGLE_CLIENT_SECRET" type="string">
+  Google OAuth client secret. Get from [Google Cloud Console](https://console.cloud.google.com).
+</ParamField>
+
+<Note>
+  Additional social providers can be configured using the [@adonisjs/ally](https://docs.adonisjs.com/guides/authentication/social-authentication) package.
+</Note>
+
+## Frontend Configuration
+
+<ParamField path="VITE_API_URL" type="string" default="http://localhost:3333">
+  API URL used by the frontend Vite build. This should match your server's address.
+</ParamField>
+
+## Rate Limiting
+
+<ParamField path="LIMITER_STORE" type="string" default="database">
+  Storage backend for rate limiting.
+  
+  **Options:** `database`, `redis`, `memory`
+</ParamField>
+
+## Environment File Setup
+
+### Development
+
+1. Copy the example file:
+   ```bash
+   cp apps/web/.env.example apps/web/.env
+   ```
+
+2. Generate your app key:
+   ```bash
+   node apps/web/ace generate:key
+   ```
+
+3. Configure database credentials (if using Docker, defaults should work)
+
+4. Configure email provider (Resend or SMTP)
+
+5. (Optional) Set up social authentication providers
+
+### Production
+
+For production deployments:
+
+- Set `NODE_ENV=production`
+- Use strong, randomly generated passwords
+- Configure production database credentials
+- Set up proper email service (Resend recommended)
+- Configure social auth with production OAuth credentials
+- Use HTTPS URLs for `VITE_API_URL`
+
+<Warning>
+  Never commit your `.env` file to version control. The `.env.example` file should only contain placeholder values.
+</Warning>

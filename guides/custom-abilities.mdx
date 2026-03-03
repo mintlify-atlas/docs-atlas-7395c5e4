@@ -1,0 +1,461 @@
+---
+title: 'Custom Abilities'
+description: 'Create and manage custom authorization abilities and policies in your application'
+icon: 'shield-halved'
+---
+
+## Overview
+
+The AdonisJS Starter Kit uses [@adonisjs/bouncer](https://docs.adonisjs.com/guides/authorization) for authorization. Bouncer provides two ways to define authorization logic:
+
+- **Abilities**: Simple, standalone authorization checks
+- **Policies**: Class-based authorization for specific resources
+
+This guide will show you how to create custom abilities and policies based on the real implementation in the starter kit.
+
+## Understanding the Authorization System
+
+### Bouncer Middleware
+
+The bouncer is initialized for every HTTP request through middleware:
+
+```typescript app/core/middleware/initialize_bouncer_middleware.ts
+import { policies } from '#core/policies/main'
+import * as abilities from '#core/abilities/main'
+import { Bouncer } from '@adonisjs/bouncer'
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+
+export default class InitializeBouncerMiddleware {
+  async handle(ctx: HttpContext, next: NextFn) {
+    // Create bouncer instance with current user
+    ctx.bouncer = new Bouncer(
+      () => ctx.auth.user || null,
+      abilities,
+      policies
+    ).setContainerResolver(ctx.containerResolver)
+
+    // Share bouncer helpers with Edge templates
+    if ('view' in ctx) {
+      ctx.view.share(ctx.bouncer.edgeHelpers)
+    }
+
+    return next()
+  }
+}
+```
+
+<Note>
+The middleware makes the bouncer available via `ctx.bouncer` in all controllers and `@can` directives in templates.
+</Note>
+
+## Creating Custom Abilities
+
+### Simple Abilities
+
+Abilities are defined in `app/core/abilities/main.ts`:
+
+```typescript app/core/abilities/main.ts
+import { Bouncer } from '@adonisjs/bouncer'
+
+export const editUser = Bouncer.ability(() => {
+  return true
+})
+```
+
+### Advanced Abilities
+
+Create more complex abilities with user and resource checks:
+
+```typescript app/core/abilities/main.ts
+import { Bouncer } from '@adonisjs/bouncer'
+import User from '#users/models/user'
+import Post from '#blog/models/post'
+
+// Simple boolean check
+export const accessAdminPanel = Bouncer.ability((user: User) => {
+  return user.isAdmin
+})
+
+// Resource-based check
+export const editPost = Bouncer.ability((user: User, post: Post) => {
+  return user.id === post.authorId || user.isAdmin
+})
+
+// Async abilities for database queries
+export const manageTeam = Bouncer.ability(async (user: User, teamId: number) => {
+  const membership = await user
+    .related('teamMemberships')
+    .query()
+    .where('team_id', teamId)
+    .where('role', 'admin')
+    .first()
+  
+  return !!membership
+})
+```
+
+### Using Abilities in Controllers
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+
+export default class PostsController {
+  async update({ bouncer, params, request, response }: HttpContext) {
+    const post = await Post.findOrFail(params.id)
+    
+    // Check authorization
+    if (await bouncer.denies('editPost', post)) {
+      return response.forbidden({ message: 'Cannot edit this post' })
+    }
+    
+    // Or use authorize to throw automatically
+    await bouncer.authorize('editPost', post)
+    
+    // Update logic here...
+  }
+}
+```
+
+## Creating Custom Policies
+
+### Policy Structure
+
+Policies group related authorization logic. Here's the UserPolicy from the starter kit:
+
+```typescript app/users/policies/user_policy.ts
+import { BasePolicy } from '@adonisjs/bouncer'
+import { AuthorizerResponse } from '@adonisjs/bouncer/types'
+import User from '#users/models/user'
+
+export default class UserPolicy extends BasePolicy {
+  viewList(currentUser: User): AuthorizerResponse {
+    return currentUser.isAdmin
+  }
+
+  view(currentUser: User, user: User): AuthorizerResponse {
+    return currentUser.isAdmin || currentUser.id === user.id
+  }
+
+  create(currentUser: User): AuthorizerResponse {
+    return currentUser.isAdmin
+  }
+
+  update(currentUser: User, user: User): AuthorizerResponse {
+    return currentUser.isAdmin || currentUser.id === user.id
+  }
+
+  delete(currentUser: User, user: User): AuthorizerResponse {
+    return currentUser.isAdmin && currentUser.id !== user.id
+  }
+
+  invite(currentUser: User): AuthorizerResponse {
+    return currentUser.isAdmin
+  }
+}
+```
+
+<Tip>
+Policy methods follow RESTful conventions:
+- `viewList` - Can view the list/index
+- `view` - Can view a specific resource
+- `create` - Can create new resources
+- `update` - Can update a resource
+- `delete` - Can delete a resource
+</Tip>
+
+### Registering Policies
+
+Register your policies in `app/core/policies/main.ts`:
+
+```typescript app/core/policies/main.ts
+export const policies = {
+  // User policies
+  UserPolicy: () => import('#users/policies/user_policy'),
+  ImpersonatePolicy: () => import('#users/policies/impersonate_policy'),
+  TokenPolicy: () => import('#users/policies/token_policy'),
+  
+  // Add your custom policies
+  PostPolicy: () => import('#blog/policies/post_policy'),
+  CommentPolicy: () => import('#blog/policies/comment_policy'),
+}
+```
+
+### Using Policies in Controllers
+
+The starter kit demonstrates policy usage throughout the UsersController:
+
+```typescript app/users/controllers/users_controller.ts
+import type { HttpContext } from '@adonisjs/core/http'
+import User from '#users/models/user'
+import UserPolicy from '#users/policies/user_policy'
+
+export default class UsersController {
+  public async index({ bouncer, inertia }: HttpContext) {
+    // Check if user can view the list
+    await bouncer.with(UserPolicy).authorize('viewList')
+
+    const users = await User.query().preload('role')
+    return inertia.render('users/index', { users })
+  }
+
+  public async update({ bouncer, params, request, response }: HttpContext) {
+    const user = await User.findOrFail(params.id)
+
+    // Check if user can update this specific user
+    await bouncer.with(UserPolicy).authorize('update', user)
+
+    const payload = await request.validateUsing(editUserValidator)
+    user.merge(payload)
+    await user.save()
+
+    return response.redirect().toRoute('users.index')
+  }
+
+  public async destroy({ bouncer, params, response }: HttpContext) {
+    const user = await User.findOrFail(params.id)
+
+    // Check if user can delete this user
+    await bouncer.with(UserPolicy).authorize('delete', user)
+
+    await user.delete()
+    return response.redirect().toRoute('users.index')
+  }
+}
+```
+
+## Real-World Policy Examples
+
+### Token Management Policy
+
+```typescript app/users/policies/token_policy.ts
+import { BasePolicy } from '@adonisjs/bouncer'
+import { AuthorizerResponse } from '@adonisjs/bouncer/types'
+import User from '#users/models/user'
+
+export default class TokenPolicy extends BasePolicy {
+  create(user: User): AuthorizerResponse {
+    return user.isAdmin
+  }
+
+  viewList(user: User): AuthorizerResponse {
+    return user.isAdmin
+  }
+}
+```
+
+### Impersonation Policy
+
+```typescript app/users/policies/impersonate_policy.ts
+import { BasePolicy } from '@adonisjs/bouncer'
+import { AuthorizerResponse } from '@adonisjs/bouncer/types'
+import User from '#users/models/user'
+
+export default class ImpersonatePolicy extends BasePolicy {
+  create(currentUser: User, user: User): AuthorizerResponse {
+    // Only admins can impersonate, and they can't impersonate themselves
+    return currentUser.isAdmin && currentUser.id !== user.id
+  }
+}
+```
+
+## Advanced Authorization Patterns
+
+### Role-Based Checks
+
+```typescript
+import Roles from '#users/enums/role'
+
+export default class ArticlePolicy extends BasePolicy {
+  publish(user: User): AuthorizerResponse {
+    return [Roles.ADMIN, Roles.EDITOR].includes(user.roleId)
+  }
+}
+```
+
+### Relationship-Based Checks
+
+```typescript
+export default class CommentPolicy extends BasePolicy {
+  async update(user: User, comment: Comment): AuthorizerResponse {
+    // Load the post relationship
+    await comment.load('post')
+    
+    // Allow if user is the comment author or the post author
+    return (
+      user.id === comment.userId || 
+      user.id === comment.post.authorId ||
+      user.isAdmin
+    )
+  }
+}
+```
+
+### Time-Based Authorization
+
+```typescript
+export default class PostPolicy extends BasePolicy {
+  update(user: User, post: Post): AuthorizerResponse {
+    if (user.id !== post.authorId) {
+      return false
+    }
+    
+    // Only allow editing within 24 hours of creation
+    const hoursSinceCreation = DateTime.now().diff(post.createdAt, 'hours').hours
+    return hoursSinceCreation < 24
+  }
+}
+```
+
+## Using Authorization in Templates
+
+Bouncer provides helpers for Edge templates:
+
+```edge
+{{-- Check abilities --}}
+@can('editPost', post)
+  <a href="{{ route('posts.edit', [post.id]) }}">Edit Post</a>
+@end
+
+{{-- Check policies --}}
+@can('UserPolicy.delete', user)
+  <button>Delete User</button>
+@end
+
+{{-- Inverse check --}}
+@cannot('UserPolicy.delete', user)
+  <p>You cannot delete this user</p>
+@end
+```
+
+## Testing Authorization
+
+```typescript
+import { test } from '@japa/runner'
+import UserPolicy from '#users/policies/user_policy'
+import User from '#users/models/user'
+
+test.group('User Policy', () => {
+  test('admin can view user list', async ({ assert }) => {
+    const admin = await User.create({ roleId: Roles.ADMIN })
+    const policy = new UserPolicy()
+    
+    assert.isTrue(policy.viewList(admin))
+  })
+
+  test('non-admin cannot view user list', async ({ assert }) => {
+    const user = await User.create({ roleId: Roles.USER })
+    const policy = new UserPolicy()
+    
+    assert.isFalse(policy.viewList(user))
+  })
+
+  test('user can update their own profile', async ({ assert }) => {
+    const user = await User.create({ roleId: Roles.USER })
+    const policy = new UserPolicy()
+    
+    assert.isTrue(policy.update(user, user))
+  })
+})
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always Check Authorization Server-Side">
+    Never rely solely on client-side authorization checks. Always verify permissions in your controllers:
+    ```typescript
+    // Good
+    await bouncer.with(UserPolicy).authorize('update', user)
+    
+    // Bad - only checking on frontend
+    // Frontend checks are for UX, not security
+    ```
+  </Accordion>
+  
+  <Accordion title="Use Policies for Resource Authorization">
+    Use policies when authorization depends on a specific resource:
+    ```typescript
+    // Good - uses policy
+    await bouncer.with(PostPolicy).authorize('update', post)
+    
+    // Less ideal - using ability
+    await bouncer.authorize('editPost', post)
+    ```
+  </Accordion>
+  
+  <Accordion title="Keep Authorization Logic Simple">
+    Move complex logic to service classes:
+    ```typescript
+    export default class TeamPolicy extends BasePolicy {
+      async manage(user: User, team: Team): AuthorizerResponse {
+        // Delegate to service
+        return await TeamService.canManage(user, team)
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Use Descriptive Method Names">
+    Policy method names should clearly describe the action:
+    ```typescript
+    // Good
+    publish(user: User, article: Article)
+    archive(user: User, article: Article)
+    
+    // Less clear
+    action1(user: User, article: Article)
+    check(user: User, article: Article)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Common Patterns
+
+### Owner or Admin Pattern
+
+```typescript
+private isOwnerOrAdmin(user: User, ownerId: number): boolean {
+  return user.id === ownerId || user.isAdmin
+}
+
+update(user: User, post: Post): AuthorizerResponse {
+  return this.isOwnerOrAdmin(user, post.authorId)
+}
+```
+
+### Before Hook
+
+Run checks before all policy methods:
+
+```typescript
+export default class PostPolicy extends BasePolicy {
+  async before(user: User | null) {
+    // Admins bypass all checks
+    if (user?.isAdmin) {
+      return true
+    }
+  }
+
+  update(user: User, post: Post): AuthorizerResponse {
+    return user.id === post.authorId
+  }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authorization Feature" icon="lock" href="/features/authorization">
+    Learn about the complete authorization system
+  </Card>
+  <Card title="User Management" icon="users" href="/features/user-management">
+    Explore user management and roles
+  </Card>
+  <Card title="User Impersonation" icon="user-secret" href="/guides/user-impersonation">
+    Implement secure user impersonation
+  </Card>
+  <Card title="Controllers Reference" icon="code" href="/reference/controllers">
+    Browse controller implementations
+  </Card>
+</CardGroup>

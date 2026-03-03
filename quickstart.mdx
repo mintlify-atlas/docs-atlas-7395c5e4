@@ -1,80 +1,313 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Get your AdonisJS Starter Kit application running in minutes
 ---
 
-## Get started in three steps
+<Note>
+  This guide will help you go from zero to a working application in less than 10 minutes. For detailed setup instructions, see the [Installation](/installation) page.
+</Note>
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Before you begin, ensure you have:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+- **Node.js** 20 or higher
+- **pnpm** 10.18.0 or higher
+- **Docker** and Docker Compose (for database services)
+
+<Steps>
+  <Step title="Create Your Project">
+    Use the AdonisJS CLI to scaffold a new project from the starter kit template:
+
+    ```bash
+    pnpm create adonisjs@latest -K="filipebraida/adonisjs-starter-kit"
+    ```
+
+    <Info>
+      This command clones the starter kit repository and sets up your project structure with all necessary dependencies.
+    </Info>
+
+    You'll be prompted to:
+    - Enter your project name
+    - Choose your preferred package manager (select pnpm)
+    - Configure additional options
+
+    Navigate to your project directory:
+
+    ```bash
+    cd your-project-name
+    ```
+  </Step>
+
+  <Step title="Configure Environment Variables">
+    Copy the example environment file and configure your application:
+
+    ```bash
+    cp apps/web/.env.example apps/web/.env
+    ```
+
+    Generate a secure application key:
+
+    ```bash
+    node apps/web/ace generate:key
+    ```
+
+    <Tip>
+      The `generate:key` command creates a cryptographically secure key and automatically updates your `.env` file.
+    </Tip>
+
+    Your `.env` file will contain essential configuration:
+
+    <CodeGroup>
+    ```bash .env
+    TZ=UTC
+    PORT=3333
+    HOST=localhost
+    LOG_LEVEL=info
+    DRIVE_DISK=fs
+    APP_KEY=your-generated-key-here
+    NODE_ENV=development
+    SESSION_DRIVER=cookie
+
+    # Database Configuration
+    DB_HOST=127.0.0.1
+    DB_PORT=5432
+    DB_USER=root
+    DB_PASSWORD=root
+    DB_DATABASE=app
+
+    # Email Configuration (Mailpit for local development)
+    SMTP_HOST=localhost
+    SMTP_PORT=1025
+
+    # API URL
+    VITE_API_URL=http://localhost:3333
+    ```
+    </CodeGroup>
+
+    <Warning>
+      Don't commit your `.env` file to version control. The starter kit includes it in `.gitignore` by default.
+    </Warning>
+  </Step>
+
+  <Step title="Start Database Services">
+    Launch PostgreSQL, PgAdmin, and Mailpit using Docker Compose:
+
+    ```bash
+    docker compose up -d
+    ```
+
+    This command starts three essential services:
+
+    <CardGroup cols={3}>
+      <Card title="PostgreSQL" icon="database">
+        Database server on port **5432**
+      </Card>
+      
+      <Card title="PgAdmin" icon="table">
+        Database admin UI on port **5050**
+      </Card>
+      
+      <Card title="Mailpit" icon="envelope">
+        Email testing on port **8025**
+      </Card>
+    </CardGroup>
+
+    <Info>
+      The PostgreSQL container automatically initializes with a development database named `adonis_app` using the script at `.github/postgres/dev-init.sql`.
+    </Info>
+
+    Verify services are running:
+
+    ```bash
+    docker compose ps
+    ```
+
+    You should see all three services with status "Up".
+  </Step>
+
+  <Step title="Initialize Database">
+    Run migrations to create the database schema:
+
+    ```bash
+    pnpm --filter web exec node ace migration:run
+    ```
+
+    This creates all necessary tables including:
+    - `roles` - User roles and permissions
+    - `users` - User accounts
+    - `access_tokens` - API authentication tokens
+    - `reset_password_tokens` - Password recovery tokens
+    - `rate_limits` - API rate limiting
+
+    Seed the database with initial data:
+
+    ```bash
+    pnpm --filter web exec node ace db:seed
+    ```
+
+    <Tip>
+      The seeder creates default users and roles. Check the seeder file at `apps/web/app/users/database/seeders/user_seeder.ts` to see what data is created.
+    </Tip>
+  </Step>
+
+  <Step title="Start Development Server">
+    Launch the development server with hot module reloading:
+
+    ```bash
+    pnpm run dev
+    ```
+
+    <Info>
+      TurboRepo orchestrates the build process, starting the AdonisJS server and Vite dev server simultaneously.
+    </Info>
+
+    You should see output similar to:
+
+    ```bash
+    • web:dev: [info] starting HTTP server on http://localhost:3333
+    • web:dev: [info] vite dev server started on http://localhost:5173
+    ```
+
+    Open your browser and navigate to:
+
+    ```
+    http://localhost:3333
+    ```
+
+    <Note>
+      The application uses Inertia.js, so requests go to port 3333 (AdonisJS), which serves React components bundled by Vite.
+    </Note>
+  </Step>
+</Steps>
+
+## What You've Accomplished
+
+Congratulations! You now have a fully functional AdonisJS Starter Kit application with:
+
+- ✅ Complete monorepo structure with TurboRepo
+- ✅ PostgreSQL database with migrations and seed data
+- ✅ Development environment with hot reloading
+- ✅ Email testing with Mailpit
+- ✅ Database administration with PgAdmin
+- ✅ Modern React frontend with Inertia.js
+- ✅ Tailwind CSS and ShadCN components
+
+## Access Your Services
+
+<CardGroup cols={3}>
+  <Card title="Application" icon="browser" href="http://localhost:3333">
+    Main application interface
+  </Card>
+  
+  <Card title="Mailpit" icon="envelope" href="http://localhost:8025">
+    View test emails
+  </Card>
+  
+  <Card title="PgAdmin" icon="database" href="http://localhost:5050">
+    Database administration
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+    **Login:**
+    - Email: `admin@repo.com`
+    - Password: `secret`
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Default Credentials
+
+<Warning>
+  Default credentials are for development only. Change them in production!
+</Warning>
+
+Check your seeder file to find the default user accounts created during the setup.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Explore the Codebase" icon="folder-tree">
+    **Monorepo Structure:**
+    - `apps/web/` - Main application
+    - `packages/ui/` - Shared components
+    - `apps/web/app/` - Feature modules (auth, users, analytics)
+  </Card>
+  
+  <Card title="Add UI Components" icon="palette">
+    Install ShadCN components:
+    
+    ```bash
+    pnpm dlx shadcn@latest add button -c apps/web
+    ```
+  </Card>
+  
+  <Card title="Create Modules" icon="cube">
+    Generate a new feature module:
+    
+    ```bash
+    node ace make:module products
+    ```
+  </Card>
+  
+  <Card title="Configure Social Auth" icon="key">
+    Set up authentication providers:
+    - Google OAuth
+    - GitHub OAuth
+    - More via @adonisjs/ally
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Database connection failed">
+    Ensure Docker services are running:
+    
+    ```bash
+    docker compose ps
+    ```
+    
+    Check your database credentials in `.env` match the Docker Compose configuration.
+  </Accordion>
+  
+  <Accordion title="Port already in use">
+    If port 3333 is busy, change it in `apps/web/.env`:
+    
+    ```bash
+    PORT=3334
+    VITE_API_URL=http://localhost:3334
+    ```
+  </Accordion>
+  
+  <Accordion title="Migration errors">
+    Reset your database and try again:
+    
+    ```bash
+    pnpm --filter web exec node ace migration:rollback
+    pnpm --filter web exec node ace migration:run
+    ```
+  </Accordion>
+  
+  <Accordion title="Module not found errors">
+    Clear your build cache and reinstall dependencies:
+    
+    ```bash
+    rm -rf node_modules apps/web/node_modules packages/*/node_modules
+    pnpm install
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+  For detailed configuration options and advanced setup, see the [Installation](/installation) guide.
+</Tip>
+
+## Learn More
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="download" href="/installation">
+    Detailed setup instructions and configuration options
+  </Card>
+  
+  <Card title="AdonisJS Docs" icon="book" href="https://docs.adonisjs.com">
+    Official AdonisJS documentation
+  </Card>
+</CardGroup>

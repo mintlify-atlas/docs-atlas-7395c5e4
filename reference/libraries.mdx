@@ -1,0 +1,723 @@
+---
+title: Libraries & Dependencies
+description: Comprehensive overview of all major libraries and packages used in the AdonisJS Starter Kit
+icon: books
+---
+
+The AdonisJS Starter Kit integrates a carefully selected set of libraries to provide a complete full-stack development experience. This page documents all major dependencies and their purposes.
+
+## Core Framework
+
+### AdonisJS Core
+
+<Card title="@adonisjs/core" icon="circle-nodes" href="https://docs.adonisjs.com">
+  **Version:** ^6.19.3
+  
+  The core framework providing routing, middleware, dependency injection, and application lifecycle management.
+</Card>
+
+## Backend Libraries
+
+### Authentication & Authorization
+
+<AccordionGroup>
+  <Accordion title="@adonisjs/auth - Authentication Framework" icon="shield-halved">
+    **Version:** ^9.5.0
+    
+    Provides authentication guards, session management, and user authentication flows.
+    
+    **Features:**
+    - Session-based authentication
+    - Token-based authentication
+    - API tokens for users
+    - Password hashing with bcrypt
+    
+    [Documentation](https://docs.adonisjs.com/guides/authentication)
+  </Accordion>
+
+  <Accordion title="@adonisjs/bouncer - Authorization" icon="user-shield">
+    **Version:** ^3.1.6
+    
+    Authorization library for defining and checking user permissions and policies.
+    
+    **Features:**
+    - Policy-based authorization
+    - Role-based access control
+    - Resource authorization
+    
+    [Documentation](https://docs.adonisjs.com/guides/authorization)
+  </Accordion>
+
+  <Accordion title="@casl/ability - Advanced Authorization" icon="lock">
+    **Version:** ^6.7.3
+    
+    CASL (pronounced "castle") is an isomorphic authorization library that restricts what resources users can access.
+    
+    **Features:**
+    - Fine-grained permissions
+    - Isomorphic (works on both frontend and backend)
+    - Ability-based authorization
+    - Field-level permissions
+  </Accordion>
+
+  <Accordion title="@adonisjs/ally - Social Authentication" icon="users">
+    **Version:** ^5.1.1
+    
+    OAuth authentication for social providers (Google, GitHub, etc.).
+    
+    **Supported Providers:**
+    - Google
+    - GitHub
+    - Facebook
+    - Twitter
+    - LinkedIn
+    - And more...
+    
+    [Documentation](https://docs.adonisjs.com/guides/authentication/social-authentication)
+  </Accordion>
+</AccordionGroup>
+
+### Database & ORM
+
+<AccordionGroup>
+  <Accordion title="@adonisjs/lucid - ORM & Query Builder" icon="database">
+    **Version:** ^21.8.2
+    
+    SQL ORM and query builder built on top of Knex.js.
+    
+    **Features:**
+    - Active Record pattern
+    - Database migrations
+    - Seeders and factories
+    - Relationships (hasOne, hasMany, belongsTo, manyToMany)
+    - Query scopes
+    - Hooks and events
+    
+    [Documentation](https://docs.adonisjs.com/guides/database/introduction)
+  </Accordion>
+
+  <Accordion title="pg - PostgreSQL Client" icon="elephant">
+    **Version:** ^8.16.3
+    
+    PostgreSQL client for Node.js. Used by Lucid as the database driver.
+    
+    [Documentation](https://node-postgres.com/)
+  </Accordion>
+</AccordionGroup>
+
+### Email
+
+<AccordionGroup>
+  <Accordion title="@adonisjs/mail - Email Service" icon="envelope">
+    **Version:** ^9.2.2
+    
+    Email sending library with support for multiple drivers.
+    
+    **Supported Drivers:**
+    - SMTP
+    - Resend
+    - Mailgun
+    - SparkPost
+    - SES (Amazon Simple Email Service)
+    
+    **Features:**
+    - Template-based emails with Edge.js
+    - Attachments
+    - Queue support
+    - Testing mode
+    
+    [Documentation](https://docs.adonisjs.com/guides/mail)
+  </Accordion>
+</AccordionGroup>
+
+### File Storage
+
+<AccordionGroup>
+  <Accordion title="@adonisjs/drive - File Storage" icon="hard-drive">
+    **Version:** ^3.4.1
+    
+    Unified API for local and cloud storage.
+    
+    **Supported Drivers:**
+    - Local filesystem
+    - Amazon S3
+    - Google Cloud Storage
+    
+    [Documentation](https://docs.adonisjs.com/guides/drive)
+  </Accordion>
+
+  <Accordion title="@jrmc/adonis-attachment - File Attachments" icon="paperclip">
+    **Version:** ^5.0.1
+    
+    Simplifies file attachment handling for Lucid models with automatic cleanup and image processing.
+    
+    **Features:**
+    - Automatic file cleanup
+    - Image processing with Sharp
+    - Multiple file attachments
+    - Model decorators
+    
+    [Documentation](https://github.com/batosai/adonis-attachment)
+  </Accordion>
+
+  <Accordion title="sharp - Image Processing" icon="image">
+    **Version:** ^0.34.4
+    
+    High-performance image processing library for resizing, converting, and optimizing images.
+    
+    [Documentation](https://sharp.pixelplumbing.com/)
+  </Accordion>
+</AccordionGroup>
+
+### Security
+
+<AccordionGroup>
+  <Accordion title="@adonisjs/shield - Security" icon="shield">
+    **Version:** ^8.2.0
+    
+    Security middleware for protecting against common web vulnerabilities.
+    
+    **Features:**
+    - CSRF protection
+    - CSP (Content Security Policy)
+    - HSTS (HTTP Strict Transport Security)
+    - X-Frame-Options
+    - XSS protection
+    
+    [Documentation](https://docs.adonisjs.com/guides/security/web-security)
+  </Accordion>
+
+  <Accordion title="@adonisjs/cors - CORS" icon="globe">
+    **Version:** ^2.2.1
+    
+    Cross-Origin Resource Sharing (CORS) middleware.
+    
+    [Documentation](https://docs.adonisjs.com/guides/security/cors)
+  </Accordion>
+
+  <Accordion title="@adonisjs/limiter - Rate Limiting" icon="gauge-high">
+    **Version:** ^2.4.0
+    
+    Rate limiting middleware to prevent abuse.
+    
+    **Storage Options:**
+    - Database
+    - Redis
+    - Memory
+    
+    [Documentation](https://docs.adonisjs.com/guides/security/rate-limiting)
+  </Accordion>
+</AccordionGroup>
+
+### Session & Cookies
+
+<AccordionGroup>
+  <Accordion title="@adonisjs/session - Session Management" icon="cookie">
+    **Version:** ^7.5.1
+    
+    Session management with multiple storage drivers.
+    
+    **Supported Drivers:**
+    - Cookie
+    - File
+    - Redis
+    - Memory
+    
+    [Documentation](https://docs.adonisjs.com/guides/session)
+  </Accordion>
+</AccordionGroup>
+
+### Validation
+
+<AccordionGroup>
+  <Accordion title="@vinejs/vine - Validation" icon="check-double">
+    **Version:** ^3.0.1
+    
+    Form and data validation library built specifically for AdonisJS.
+    
+    **Features:**
+    - Type-safe schemas
+    - Custom error messages
+    - Conditional validation
+    - Custom rules
+    - Async validation
+    
+    [Documentation](https://vinejs.dev/)
+  </Accordion>
+</AccordionGroup>
+
+### Internationalization
+
+<AccordionGroup>
+  <Accordion title="@adonisjs/i18n - Backend i18n" icon="language">
+    **Version:** ^2.2.2
+    
+    Internationalization for AdonisJS backend.
+    
+    **Features:**
+    - JSON translation files
+    - Pluralization
+    - Formatting (dates, numbers, currency)
+    - Locale detection
+    
+    [Documentation](https://docs.adonisjs.com/guides/i18n)
+  </Accordion>
+
+  <Accordion title="i18next - Frontend i18n" icon="globe">
+    **Version:** ^25.5.3
+    
+    Popular i18n framework for JavaScript.
+    
+    [Documentation](https://www.i18next.com/)
+  </Accordion>
+
+  <Accordion title="i18next-icu - ICU Message Format" icon="message">
+    **Version:** ^2.4.0
+    
+    ICU message format support for i18next, enabling advanced pluralization and formatting.
+    
+    [Documentation](https://github.com/i18next/i18next-icu)
+  </Accordion>
+
+  <Accordion title="react-i18next - React Integration" icon="react">
+    **Version:** ^15.5.2
+    
+    React bindings for i18next.
+    
+    [Documentation](https://react.i18next.com/)
+  </Accordion>
+</AccordionGroup>
+
+### Data Transfer & Type Safety
+
+<AccordionGroup>
+  <Accordion title="@adocasts.com/dto - Data Transfer Objects" icon="arrow-right-arrow-left">
+    **Version:** ^0.0.10
+    
+    Type-safe data transfer objects for AdonisJS. Simplifies data transformation between layers.
+    
+    **Features:**
+    - Type-safe DTOs
+    - Automatic transformation
+    - Nested DTOs
+    - Collection handling
+    
+    [Documentation](https://github.com/adocasts/package-dto)
+  </Accordion>
+
+  <Accordion title="@tuyau/inertia - Type-Safe API Client" icon="plug">
+    **Version:** ^0.0.15
+    
+    End-to-end type safety between AdonisJS backend and Inertia.js frontend.
+    
+    **Features:**
+    - Automatic type generation
+    - Type-safe API calls
+    - Inertia integration
+    - Request/response validation
+    
+    [Documentation](https://github.com/Julien-R44/tuyau)
+  </Accordion>
+</AccordionGroup>
+
+### Modular Architecture
+
+<AccordionGroup>
+  <Accordion title="@adonisjs-community/modules - Module System" icon="cubes">
+    **Version:** ^1.1.0
+    
+    Organize your AdonisJS application into feature-based modules.
+    
+    **Features:**
+    - Feature-based organization
+    - Automatic path aliases
+    - Module scaffolding
+    - Improved maintainability
+    
+    [Documentation](https://github.com/adonisjs-community/modules)
+  </Accordion>
+</AccordionGroup>
+
+### Static Files & Assets
+
+<AccordionGroup>
+  <Accordion title="@adonisjs/static - Static File Server" icon="file">
+    **Version:** ^1.1.1
+    
+    Serves static files from the public directory.
+    
+    [Documentation](https://docs.adonisjs.com/guides/static-assets)
+  </Accordion>
+
+  <Accordion title="@adonisjs/vite - Vite Integration" icon="bolt">
+    **Version:** ^4.0.0
+    
+    Integrates Vite for frontend asset bundling.
+    
+    [Documentation](https://docs.adonisjs.com/guides/vite)
+  </Accordion>
+</AccordionGroup>
+
+## Frontend Libraries
+
+### React & Inertia
+
+<AccordionGroup>
+  <Accordion title="@adonisjs/inertia - Inertia.js Backend" icon="link">
+    **Version:** ^3.1.1
+    
+    AdonisJS adapter for Inertia.js, enabling SPA experience without building an API.
+    
+    [Documentation](https://docs.adonisjs.com/guides/inertia)
+  </Accordion>
+
+  <Accordion title="@inertiajs/react - Inertia.js Frontend" icon="react">
+    **Version:** ^2.2.6
+    
+    React adapter for Inertia.js.
+    
+    [Documentation](https://inertiajs.com/)
+  </Accordion>
+
+  <Accordion title="react - React Library" icon="react">
+    **Version:** ^19.1.0
+    
+    JavaScript library for building user interfaces.
+    
+    [Documentation](https://react.dev/)
+  </Accordion>
+
+  <Accordion title="react-dom - React DOM Renderer" icon="window-maximize">
+    **Version:** ^19.1.0
+    
+    React package for working with the DOM.
+  </Accordion>
+</AccordionGroup>
+
+### UI Components
+
+<AccordionGroup>
+  <Accordion title="Radix UI - Headless Components" icon="cube">
+    A collection of accessible, unstyled UI components for React.
+    
+    **Installed Components:**
+    - Alert Dialog (^1.1.14)
+    - Avatar (^1.1.10)
+    - Checkbox (^1.3.3)
+    - Dialog (^1.1.14)
+    - Dropdown Menu (^2.1.15)
+    - Label (^2.1.7)
+    - Navigation Menu (^1.2.13)
+    - Popover (^1.1.14)
+    - Progress (^1.1.7)
+    - Radio Group (^1.3.8)
+    - Scroll Area (^1.2.9)
+    - Select (^2.2.5)
+    - Separator (^1.1.7)
+    - Slot (^1.2.3)
+    - Tooltip (^1.2.7)
+    - Direction (^1.1.1)
+    
+    [Documentation](https://www.radix-ui.com/)
+  </Accordion>
+
+  <Accordion title="lucide-react - Icons" icon="icons">
+    **Version:** ^0.544.0
+    
+    Beautiful and consistent icon library with 1000+ icons.
+    
+    [Documentation](https://lucide.dev/)
+  </Accordion>
+
+  <Accordion title="@tanstack/react-table - Data Tables" icon="table">
+    **Version:** ^8.21.3
+    
+    Headless UI for building powerful tables and datagrids.
+    
+    **Features:**
+    - Sorting
+    - Filtering
+    - Pagination
+    - Row selection
+    - Column resizing
+    
+    [Documentation](https://tanstack.com/table/)
+  </Accordion>
+
+  <Accordion title="sonner - Toast Notifications" icon="bell">
+    **Version:** ^2.0.5
+    
+    Beautiful toast notifications for React.
+    
+    [Documentation](https://sonner.emilkowal.ski/)
+  </Accordion>
+
+  <Accordion title="cmdk - Command Menu" icon="terminal">
+    **Version:** ^1.1.1
+    
+    Fast, composable command menu for React.
+    
+    [Documentation](https://cmdk.paco.me/)
+  </Accordion>
+</AccordionGroup>
+
+### Styling
+
+<AccordionGroup>
+  <Accordion title="tailwindcss - Utility CSS Framework" icon="wind">
+    **Version:** ^4.1.14
+    
+    Utility-first CSS framework for rapid UI development.
+    
+    [Documentation](https://tailwindcss.com/)
+  </Accordion>
+
+  <Accordion title="@tailwindcss/vite - Vite Plugin" icon="bolt">
+    **Version:** ^4.1.14
+    
+    Official Vite plugin for Tailwind CSS v4.
+  </Accordion>
+
+  <Accordion title="class-variance-authority - CVA" icon="layer-group">
+    **Version:** ^0.7.1
+    
+    Type-safe component variants for Tailwind CSS.
+    
+    [Documentation](https://cva.style/)
+  </Accordion>
+
+  <Accordion title="tailwind-merge - Class Merging" icon="code-merge">
+    **Version:** ^3.3.1
+    
+    Merge Tailwind CSS classes without style conflicts.
+  </Accordion>
+
+  <Accordion title="clsx - Conditional Classes" icon="code">
+    **Version:** ^2.1.1
+    
+    Utility for constructing className strings conditionally.
+  </Accordion>
+
+  <Accordion title="next-themes - Theme Management" icon="moon">
+    **Version:** ^0.4.6
+    
+    Perfect theme management for Next.js and React apps (light/dark mode).
+    
+    [Documentation](https://github.com/pacocoursey/next-themes)
+  </Accordion>
+</AccordionGroup>
+
+### Animation
+
+<AccordionGroup>
+  <Accordion title="motion - Animation Library" icon="wand-magic-sparkles">
+    **Version:** ^12.23.12
+    
+    Production-ready animation library for React (formerly Framer Motion).
+    
+    [Documentation](https://motion.dev/)
+  </Accordion>
+
+  <Accordion title="tw-animate-css - Tailwind Animations" icon="play">
+    **Version:** ^1.3.2
+    
+    Animate.css integration for Tailwind CSS.
+  </Accordion>
+</AccordionGroup>
+
+### Utilities
+
+<AccordionGroup>
+  <Accordion title="luxon - Date/Time" icon="clock">
+    **Version:** ^3.7.2
+    
+    Modern date/time library, successor to Moment.js.
+    
+    [Documentation](https://moment.github.io/luxon/)
+  </Accordion>
+
+  <Accordion title="usehooks-ts - React Hooks" icon="hook">
+    **Version:** ^3.1.1
+    
+    Collection of useful React hooks written in TypeScript.
+    
+    [Documentation](https://usehooks-ts.com/)
+  </Accordion>
+
+  <Accordion title="reflect-metadata - Decorators" icon="at">
+    **Version:** ^0.2.2
+    
+    Polyfill for metadata reflection API, required for TypeScript decorators.
+  </Accordion>
+
+  <Accordion title="zod - Schema Validation" icon="shield-check">
+    **Version:** ^3.25.67
+    
+    TypeScript-first schema validation library.
+    
+    [Documentation](https://zod.dev/)
+  </Accordion>
+</AccordionGroup>
+
+## Build Tools
+
+### Monorepo & Build
+
+<AccordionGroup>
+  <Accordion title="turbo - TurboRepo" icon="rocket">
+    **Version:** ^2.5.8
+    
+    High-performance build system for JavaScript/TypeScript monorepos.
+    
+    **Features:**
+    - Incremental builds
+    - Remote caching
+    - Parallel execution
+    - Task pipelines
+    
+    [Documentation](https://turbo.build/repo)
+  </Accordion>
+
+  <Accordion title="vite - Build Tool" icon="bolt">
+    **Version:** ^7.1.9
+    
+    Next-generation frontend build tool with lightning-fast HMR.
+    
+    [Documentation](https://vite.dev/)
+  </Accordion>
+
+  <Accordion title="@vitejs/plugin-react - React Plugin" icon="react">
+    **Version:** ^5.0.4
+    
+    Official Vite plugin for React with Fast Refresh support.
+  </Accordion>
+</AccordionGroup>
+
+### TypeScript
+
+<AccordionGroup>
+  <Accordion title="typescript - TypeScript Language" icon="code">
+    **Version:** ~5.9.3
+    
+    Typed superset of JavaScript.
+    
+    [Documentation](https://www.typescriptlang.org/)
+  </Accordion>
+
+  <Accordion title="@adonisjs/tsconfig - AdonisJS Config" icon="gear">
+    **Version:** ^1.4.1
+    
+    Shared TypeScript configuration for AdonisJS projects.
+  </Accordion>
+</AccordionGroup>
+
+### Code Quality
+
+<AccordionGroup>
+  <Accordion title="eslint - Linting" icon="circle-exclamation">
+    **Version:** ^9.37.0
+    
+    Pluggable linting utility for JavaScript and TypeScript.
+    
+    [Documentation](https://eslint.org/)
+  </Accordion>
+
+  <Accordion title="prettier - Code Formatting" icon="broom">
+    **Version:** ^3.6.2
+    
+    Opinionated code formatter.
+    
+    [Documentation](https://prettier.io/)
+  </Accordion>
+
+  <Accordion title="@adonisjs/prettier-config - Prettier Config" icon="gear">
+    **Version:** ^1.4.5
+    
+    Official Prettier configuration for AdonisJS.
+  </Accordion>
+</AccordionGroup>
+
+## Testing
+
+<AccordionGroup>
+  <Accordion title="@japa/runner - Test Runner" icon="vial">
+    **Version:** ^4.4.0
+    
+    Minimal and elegant test runner for Node.js.
+    
+    [Documentation](https://japa.dev/)
+  </Accordion>
+
+  <Accordion title="@japa/assert - Assertions" icon="check">
+    **Version:** ^4.1.1
+    
+    Assertion library for Japa tests.
+  </Accordion>
+
+  <Accordion title="@japa/plugin-adonisjs - AdonisJS Plugin" icon="plug">
+    **Version:** ^4.0.0
+    
+    Japa plugin for testing AdonisJS applications.
+  </Accordion>
+</AccordionGroup>
+
+## Development Tools
+
+<AccordionGroup>
+  <Accordion title="@adonisjs/assembler - Build Tools" icon="hammer">
+    **Version:** ^7.8.2
+    
+    Build tools for compiling AdonisJS TypeScript applications.
+  </Accordion>
+
+  <Accordion title="hot-hook - Hot Module Replacement" icon="fire">
+    **Version:** ^0.4.0
+    
+    Hot module replacement for Node.js applications.
+  </Accordion>
+
+  <Accordion title="pino-pretty - Log Formatting" icon="align-left">
+    **Version:** ^13.1.1
+    
+    Pretty formatting for Pino logs during development.
+  </Accordion>
+
+  <Accordion title="@swc/core - Fast Transpiler" icon="gauge-high">
+    **Version:** 1.13.5
+    
+    Super-fast TypeScript/JavaScript compiler written in Rust.
+    
+    [Documentation](https://swc.rs/)
+  </Accordion>
+</AccordionGroup>
+
+## Template Engine
+
+<AccordionGroup>
+  <Accordion title="edge.js - Template Engine" icon="code">
+    **Version:** ^6.3.0
+    
+    Simple, modern, and batteries-included template engine for Node.js.
+    
+    **Used for:**
+    - Email templates
+    - Server-side rendering
+    - Component templates
+    
+    [Documentation](https://edgejs.dev/)
+  </Accordion>
+</AccordionGroup>
+
+## Summary
+
+The AdonisJS Starter Kit leverages:
+
+- **25+ AdonisJS packages** for backend functionality
+- **20+ Radix UI components** for accessible UI
+- **React 19** with Inertia.js for modern SPA experience
+- **Tailwind CSS v4** for rapid styling
+- **TurboRepo + pnpm** for efficient monorepo management
+- **TypeScript** throughout for type safety
+- **Japa** for comprehensive testing
+
+All dependencies are carefully selected to work together seamlessly, providing a robust foundation for building production-ready applications.

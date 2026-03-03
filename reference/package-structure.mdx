@@ -1,0 +1,343 @@
+---
+title: Package Structure
+description: Understanding the monorepo workspace structure and package configuration
+icon: box
+---
+
+The AdonisJS Starter Kit uses a monorepo architecture powered by **TurboRepo** and **pnpm workspaces**. This structure enables efficient code sharing, parallel builds, and modular development.
+
+## Workspace Overview
+
+```bash
+root/
+├── apps/
+│   └── web/              # Main AdonisJS application
+├── packages/
+│   ├── ui/               # Shared UI components (ShadCN)
+│   ├── eslint-config/    # Shared ESLint configuration
+│   └── typescript-config/# Shared TypeScript configuration
+├── pnpm-workspace.yaml   # Monorepo configuration
+├── turbo.json            # TurboRepo pipeline configuration
+└── package.json          # Root workspace package
+```
+
+## Root Package
+
+**Location:** `/package.json`
+
+### Configuration
+
+<ParamField path="name" type="string">
+  `adonisjs-starter-kit`
+</ParamField>
+
+<ParamField path="version" type="string">
+  `0.0.2`
+</ParamField>
+
+<ParamField path="packageManager" type="string">
+  `pnpm@10.18.0` - Enforces pnpm version for consistency
+</ParamField>
+
+<ParamField path="engines.node" type="string">
+  `>=20` - Requires Node.js version 20 or higher
+</ParamField>
+
+### Scripts
+
+<ResponseField name="build" type="string">
+  `turbo build` - Runs build tasks across all packages
+</ResponseField>
+
+<ResponseField name="dev" type="string">
+  `turbo dev` - Starts development servers for all apps
+</ResponseField>
+
+<ResponseField name="lint" type="string">
+  `turbo lint` - Runs linting across all packages
+</ResponseField>
+
+<ResponseField name="format" type="string">
+  `prettier --write "**/*.{ts,tsx,md}"` - Formats all code
+</ResponseField>
+
+<ResponseField name="docker:prod" type="string">
+  `docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d` - Starts production Docker containers
+</ResponseField>
+
+### Dependencies
+
+- `@workspace/eslint-config` - Internal shared ESLint config
+- `@workspace/typescript-config` - Internal shared TypeScript config
+- `prettier@^3.6.2` - Code formatting
+- `turbo@^2.5.8` - Monorepo build system
+- `typescript@~5.9.3` - TypeScript language
+
+## Apps
+
+### Web Application
+
+**Location:** `/apps/web/package.json`
+
+The main full-stack application built with AdonisJS, featuring both backend and frontend (via Inertia.js).
+
+#### Configuration
+
+<ParamField path="name" type="string">
+  `web`
+</ParamField>
+
+<ParamField path="type" type="string">
+  `module` - Uses ES modules
+</ParamField>
+
+#### Module Path Aliases
+
+The `imports` field defines module path aliases for cleaner imports:
+
+```json
+{
+  "imports": {
+    "#start/*": "./start/*.js",
+    "#config/*": "./config/*.js",
+    "#core/*": "./app/core/*.js",
+    "#common/*": "./app/common/*.js",
+    "#auth/*": "./app/auth/*.js",
+    "#users/*": "./app/users/*.js",
+    "#marketing/*": "./app/marketing/*.js",
+    "#analytics/*": "./app/analytics/*.js",
+    "#providers/*": "./providers/*.js",
+    "#tests/*": "./tests/*.js"
+  }
+}
+```
+
+This allows imports like:
+```typescript
+import { User } from '#users/models/user'
+import { authConfig } from '#config/auth'
+```
+
+#### Scripts
+
+<ResponseField name="start" type="string">
+  `node bin/server.js` - Starts production server
+</ResponseField>
+
+<ResponseField name="build" type="string">
+  `node ace build` - Builds application for production
+</ResponseField>
+
+<ResponseField name="dev" type="string">
+  `node ace serve --hmr` - Development server with hot module replacement
+</ResponseField>
+
+<ResponseField name="test" type="string">
+  `node ace test` - Runs test suite
+</ResponseField>
+
+<ResponseField name="lint" type="string">
+  `eslint .` - Lints codebase
+</ResponseField>
+
+<ResponseField name="format" type="string">
+  `prettier --write .` - Formats all files
+</ResponseField>
+
+<ResponseField name="typecheck" type="string">
+  `tsc --noEmit` - Type checks without emitting files
+</ResponseField>
+
+#### Hot Module Replacement
+
+Configured via `hotHook` for faster development:
+
+```json
+{
+  "hotHook": {
+    "boundaries": [
+      "./app/controllers/**/*.ts",
+      "./app/middleware/*.ts"
+    ]
+  }
+}
+```
+
+## Packages
+
+### UI Package
+
+**Location:** `/packages/ui/package.json`
+
+Shared UI component library built with ShadCN and Radix UI.
+
+#### Configuration
+
+<ParamField path="name" type="string">
+  `@workspace/ui`
+</ParamField>
+
+<ParamField path="type" type="string">
+  `module` - Uses ES modules
+</ParamField>
+
+#### Exports
+
+```json
+{
+  "exports": {
+    "./globals.css": "./src/styles/globals.css",
+    "./postcss.config": "./postcss.config.mjs",
+    "./lib/*": "./src/lib/*.ts",
+    "./components/*": "./src/components/*.tsx",
+    "./hooks/*": "./src/hooks/*.ts"
+  }
+}
+```
+
+Usage example:
+```typescript
+import { Button } from '@workspace/ui/components/button'
+import { useTheme } from '@workspace/ui/hooks/use-theme'
+```
+
+#### Key Dependencies
+
+- **Radix UI** - Headless UI components
+- **Tailwind CSS** - Utility-first CSS framework
+- **React 19** - UI library
+- **Motion** - Animation library
+- **Lucide React** - Icon library
+- **TanStack Table** - Table component
+- **next-themes** - Theme management
+- **sonner** - Toast notifications
+- **zod** - Schema validation
+
+### ESLint Config Package
+
+**Location:** `/packages/eslint-config/package.json`
+
+Centralized ESLint configuration for the entire workspace.
+
+#### Configuration
+
+<ParamField path="name" type="string">
+  `@workspace/eslint-config`
+</ParamField>
+
+#### Exports
+
+```json
+{
+  "exports": {
+    "./base": "./base.js",
+    "./adonis": "./adonis.app.js",
+    "./next-js": "./next.js",
+    "./react-internal": "./react-internal.js"
+  }
+}
+```
+
+#### Key Dependencies
+
+- `@adonisjs/eslint-config` - AdonisJS ESLint rules
+- `@typescript-eslint/eslint-plugin` - TypeScript linting
+- `eslint-plugin-react` - React linting rules
+- `eslint-plugin-turbo` - TurboRepo linting rules
+
+### TypeScript Config Package
+
+**Location:** `/packages/typescript-config/package.json`
+
+Shared TypeScript configuration.
+
+#### Configuration
+
+<ParamField path="name" type="string">
+  `@workspace/typescript-config`
+</ParamField>
+
+#### Dependencies
+
+- `@adonisjs/tsconfig@^1.4.1` - Base TypeScript config from AdonisJS
+
+## Workspace Configuration
+
+### pnpm-workspace.yaml
+
+Defines which directories are part of the workspace:
+
+```yaml
+packages:
+  - 'apps/*'
+  - 'packages/*'
+```
+
+### turbo.json
+
+Configures build pipeline and caching. TurboRepo intelligently caches build outputs and runs tasks in parallel.
+
+## Adding New Packages
+
+To add a new shared package:
+
+1. Create package directory:
+   ```bash
+   mkdir -p packages/my-package
+   ```
+
+2. Initialize package.json:
+   ```bash
+   cd packages/my-package
+   pnpm init
+   ```
+
+3. Update name to use workspace scope:
+   ```json
+   {
+     "name": "@workspace/my-package",
+     "version": "0.0.0",
+     "private": true
+   }
+   ```
+
+4. Use in other packages:
+   ```bash
+   cd apps/web
+   pnpm add @workspace/my-package
+   ```
+
+## Workspace Commands
+
+Run commands in specific packages:
+
+```bash
+# Run command in web app
+pnpm --filter web dev
+
+# Run command in all packages
+pnpm -r test
+
+# Add dependency to specific package
+pnpm --filter web add lodash
+
+# Add dev dependency to workspace root
+pnpm add -D -w typescript
+```
+
+## Benefits of Monorepo Structure
+
+<CardGroup cols={2}>
+  <Card title="Code Sharing" icon="share-nodes">
+    Share components, utilities, and configurations across apps
+  </Card>
+  <Card title="Atomic Changes" icon="atom">
+    Make coordinated changes across multiple packages in a single commit
+  </Card>
+  <Card title="Unified Tooling" icon="wrench">
+    One set of tools and configurations for the entire project
+  </Card>
+  <Card title="Fast Builds" icon="bolt">
+    TurboRepo caching speeds up builds and tests
+  </Card>
+</CardGroup>

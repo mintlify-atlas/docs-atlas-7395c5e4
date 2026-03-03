@@ -1,0 +1,155 @@
+---
+title: Project Architecture Overview
+description: Understanding the AdonisJS Starter Kit's architecture and directory structure
+---
+
+The AdonisJS Starter Kit follows a modern, scalable architecture that combines a **monorepo structure** with **modular organization** to provide maximum flexibility and maintainability.
+
+## Architectural Principles
+
+The starter kit is built on three core architectural principles:
+
+1. **Monorepo Organization** - Multiple apps and shared packages in a single repository
+2. **Modular Design** - Feature-based modules for better code organization
+3. **Workspace Management** - Shared dependencies and configurations across the project
+
+## High-Level Structure
+
+```bash
+adonisjs-starter-kit/
+├── apps/
+│   └── web/                    # Main AdonisJS application
+│       ├── app/                # Application code (modular)
+│       │   ├── auth/          # Authentication module
+│       │   ├── users/         # User management module
+│       │   ├── core/          # Core functionality
+│       │   ├── common/        # Common utilities
+│       │   ├── marketing/     # Marketing pages
+│       │   └── analytics/     # Analytics module
+│       ├── config/            # Configuration files
+│       ├── resources/         # Views, styles, and React components
+│       ├── start/             # Bootstrap files
+│       └── tests/             # Test files
+│
+├── packages/
+│   ├── ui/                    # Shared UI components (ShadCN)
+│   ├── eslint-config/         # Shared ESLint configuration
+│   └── typescript-config/     # Shared TypeScript configuration
+│
+├── pnpm-workspace.yaml        # pnpm workspace configuration
+├── turbo.json                 # TurboRepo configuration
+└── package.json               # Root package configuration
+```
+
+## Apps Directory
+
+The `apps/` directory contains runnable applications. Currently, the starter kit includes:
+
+### web (apps/web)
+
+The main full-stack AdonisJS application that combines:
+- **Backend**: AdonisJS server with routing, controllers, and business logic
+- **Frontend**: React components with Inertia.js for SPA experience
+- **Database**: PostgreSQL with Lucid ORM
+- **Authentication**: Session-based auth with social login support
+
+The web app is structured using modules for better organization (see [Modular Architecture](/structure/modules)).
+
+## Packages Directory
+
+The `packages/` directory contains shared code that can be imported by any app:
+
+<CardGroup cols={3}>
+  <Card title="@workspace/ui" icon="palette">
+    Shared UI components built with ShadCN and Radix UI. Includes buttons, dialogs, forms, and more.
+  </Card>
+  
+  <Card title="@workspace/eslint-config" icon="code">
+    Centralized ESLint configurations for consistent code style across all apps and packages.
+  </Card>
+  
+  <Card title="@workspace/typescript-config" icon="file-code">
+    Shared TypeScript configurations extending AdonisJS base config.
+  </Card>
+</CardGroup>
+
+## Technology Stack
+
+The starter kit leverages modern technologies:
+
+<AccordionGroup>
+  <Accordion title="Build & Tooling">
+    - **TurboRepo**: Monorepo build system with intelligent caching
+    - **pnpm**: Fast, disk-space efficient package manager
+    - **Vite**: Lightning-fast dev server and build tool
+    - **TypeScript**: Type-safe development across the entire stack
+  </Accordion>
+  
+  <Accordion title="Backend">
+    - **AdonisJS v6**: Modern Node.js framework
+    - **PostgreSQL**: Robust relational database
+    - **Lucid ORM**: Type-safe database queries
+    - **Inertia.js**: Server-side routing with client-side rendering
+  </Accordion>
+  
+  <Accordion title="Frontend">
+    - **React 19**: Latest React with modern features
+    - **Tailwind CSS v4**: Utility-first styling
+    - **ShadCN**: Accessible, customizable UI components
+    - **Radix UI**: Unstyled, accessible component primitives
+  </Accordion>
+</AccordionGroup>
+
+## Configuration Files
+
+### Root Level
+
+- **package.json**: Defines workspace-level scripts and shared dev dependencies
+- **pnpm-workspace.yaml**: Declares workspace packages (apps/* and packages/*)
+- **turbo.json**: Configures build pipeline, caching, and task dependencies
+- **tsconfig.json**: Base TypeScript configuration
+
+### App Level (apps/web)
+
+- **adonisrc.ts**: AdonisJS configuration including providers, commands, and module preloads
+- **package.json**: App-specific dependencies and import aliases for modules
+- **vite.config.ts**: Vite configuration for frontend builds
+- **tsconfig.json**: TypeScript config extending root configuration
+
+<Tip>
+  The modular structure allows you to add new features without cluttering the main app directory. Each module is self-contained with its own controllers, models, routes, and UI.
+</Tip>
+
+## Import Aliases
+
+The starter kit uses TypeScript import aliases for clean imports:
+
+```typescript
+// Module imports
+import UserController from '#users/controllers/users_controller'
+import { authenticateUser } from '#auth/middleware/auth_middleware'
+import { AppException } from '#core/exceptions/app_exception'
+
+// Config and start files
+import database from '#config/database'
+import router from '#start/kernel'
+
+// Workspace packages
+import { Button } from '@workspace/ui/components/button'
+```
+
+<Note>
+  Import aliases are defined in `apps/web/package.json` under the `imports` field. Each module gets its own alias (e.g., `#users/*`, `#auth/*`).
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Monorepo Setup" icon="boxes-stacked" href="/structure/monorepo">
+    Learn about TurboRepo and pnpm workspace configuration
+  </Card>
+  
+  <Card title="Modular Architecture" icon="puzzle-piece" href="/structure/modules">
+    Understand how modules work and how to create new ones
+  </Card>
+</CardGroup>

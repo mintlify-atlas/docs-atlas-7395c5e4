@@ -1,0 +1,334 @@
+---
+title: Database Setup
+description: Learn how to work with the database, migrations, and seeders in the AdonisJS Starter Kit
+---
+
+The AdonisJS Starter Kit uses **Lucid ORM** with PostgreSQL for database management. This guide covers database configuration, migrations, and seeders.
+
+## Database Configuration
+
+The database configuration is located in `config/database.ts`:
+
+```typescript config/database.ts
+import env from '#start/env'
+import { defineConfig } from '@adonisjs/lucid'
+import app from '@adonisjs/core/services/app'
+
+const dbConfig = defineConfig({
+  connection: 'postgres',
+  prettyPrintDebugQueries: app.inDev,
+  connections: {
+    postgres: {
+      client: 'pg',
+      connection: {
+        host: env.get('DB_HOST'),
+        port: env.get('DB_PORT'),
+        user: env.get('DB_USER'),
+        password: env.get('DB_PASSWORD'),
+        database: env.get('DB_DATABASE'),
+      },
+      migrations: {
+        naturalSort: true,
+        paths: ['app/users/database/migrations'],
+      },
+      seeders: {
+        paths: ['app/users/database/seeders'],
+      },
+      debug: app.inDev,
+    },
+  },
+})
+
+export default dbConfig
+```
+
+<Note>
+  The starter kit uses a modular structure where migrations and seeders are organized by feature (e.g., `app/users/database/migrations`).
+</Note>
+
+## Environment Variables
+
+Configure your database connection in the `.env` file:
+
+```bash .env
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_DATABASE=adonis_starter
+```
+
+## Creating Migrations
+
+Generate a new migration using the Ace CLI:
+
+```bash
+node ace make:migration create_posts_table
+```
+
+### Migration Example: Roles Table
+
+Here's a real migration from the starter kit that creates the roles table:
+
+```typescript app/users/database/migrations/1737139066940_create_roles_table.ts
+import { BaseSchema } from '@adonisjs/lucid/schema'
+import Roles from '#users/enums/role'
+
+export default class extends BaseSchema {
+  protected tableName = 'roles'
+
+  async up() {
+    this.schema.createTable(this.tableName, (table) => {
+      table.increments('id')
+      table.string('name', 50).notNullable()
+      table.string('description', 255).nullable()
+
+      table.timestamp('created_at')
+      table.timestamp('updated_at')
+    })
+
+    this.defer(async (db) => {
+      await db.table(this.tableName).insert([
+        {
+          id: Roles.USER,
+          name: 'User',
+          description: 'Authenticated User',
+        },
+        {
+          id: Roles.ADMIN,
+          name: 'Admin',
+          description: 'Super User with full access',
+        },
+      ])
+    })
+  }
+
+  async down() {
+    this.schema.dropTable(this.tableName)
+  }
+}
+```
+
+<Tip>
+  Use the `defer` method to insert seed data after the table is created. This is useful for lookup tables and default values.
+</Tip>
+
+### Migration Example: Users Table with Foreign Keys
+
+```typescript app/users/database/migrations/1737139066942_create_users_table.ts
+import { BaseSchema } from '@adonisjs/lucid/schema'
+import Roles from '#users/enums/role'
+
+export default class extends BaseSchema {
+  protected tableName = 'users'
+
+  async up() {
+    this.schema.createTable(this.tableName, (table) => {
+      table.increments('id').notNullable()
+      table
+        .integer('role_id')
+        .unsigned()
+        .references('id')
+        .inTable('roles')
+        .notNullable()
+        .defaultTo(Roles.USER)
+      table.string('full_name').nullable()
+      table.string('email', 254).notNullable().unique()
+      table.string('password').nullable()
+      table.string('avatar_url').nullable().defaultTo(null)
+      table.json('avatar').nullable()
+
+      table.timestamp('created_at').notNullable()
+      table.timestamp('updated_at').nullable()
+    })
+  }
+
+  async down() {
+    this.schema.dropTable(this.tableName)
+  }
+}
+```
+
+## Running Migrations
+
+Execute migrations to update your database schema:
+
+<CodeGroup>
+```bash Run migrations
+node ace migration:run
+```
+
+```bash Rollback last batch
+node ace migration:rollback
+```
+
+```bash Rollback all migrations
+node ace migration:rollback --batch=0
+```
+
+```bash Refresh database (rollback and re-run)
+node ace migration:refresh
+```
+
+```bash Fresh database (drop and re-run)
+node ace migration:fresh
+```
+</CodeGroup>
+
+## Database Seeders
+
+Seeders populate your database with test or default data.
+
+### Creating a Seeder
+
+```bash
+node ace make:seeder user
+```
+
+### Seeder Example
+
+Here's the actual user seeder from the starter kit:
+
+```typescript app/users/database/seeders/user_seeder.ts
+import { BaseSeeder } from '@adonisjs/lucid/seeders'
+import User from '#users/models/user'
+import Roles from '#users/enums/role'
+
+export default class UserSeeder extends BaseSeeder {
+  async run() {
+    const uniqueKey = 'email'
+
+    await User.updateOrCreateMany(uniqueKey, [
+      {
+        email: 'admin@repo.com',
+        fullName: 'Administrador',
+        password: '123',
+        roleId: Roles.ADMIN,
+      },
+    ])
+  }
+}
+```
+
+<Note>
+  Using `updateOrCreateMany` ensures the seeder is idempotent - it won't create duplicates when run multiple times.
+</Note>
+
+### Running Seeders
+
+<CodeGroup>
+```bash Run all seeders
+node ace db:seed
+```
+
+```bash Run specific seeder
+node ace db:seed --files=user_seeder.ts
+```
+
+```bash Refresh and seed
+node ace migration:fresh --seed
+```
+</CodeGroup>
+
+## Database Queries
+
+Use Lucid ORM to query your database:
+
+<CodeGroup>
+```typescript Find all
+const users = await User.all()
+```
+
+```typescript Find by ID
+const user = await User.findOrFail(1)
+```
+
+```typescript Where clause
+const admins = await User.query()
+  .where('role_id', Roles.ADMIN)
+  .exec()
+```
+
+```typescript With relationships
+const user = await User.query()
+  .where('id', 1)
+  .preload('role')
+  .firstOrFail()
+```
+</CodeGroup>
+
+## Common Commands
+
+<CardGroup cols={2}>
+  <Card title="Create Migration" icon="plus">
+    ```bash
+    node ace make:migration table_name
+    ```
+  </Card>
+  
+  <Card title="Run Migrations" icon="play">
+    ```bash
+    node ace migration:run
+    ```
+  </Card>
+  
+  <Card title="Create Seeder" icon="seedling">
+    ```bash
+    node ace make:seeder name
+    ```
+  </Card>
+  
+  <Card title="Run Seeders" icon="database">
+    ```bash
+    node ace db:seed
+    ```
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use descriptive migration names">
+    Name your migrations clearly to describe what they do:
+    - `create_users_table.ts`
+    - `add_avatar_to_users_table.ts`
+    - `create_posts_comments_table.ts`
+  </Accordion>
+
+  <Accordion title="Never modify existing migrations">
+    Once a migration has been run in production, create a new migration to modify the schema instead of editing the existing one.
+  </Accordion>
+
+  <Accordion title="Use transactions for complex migrations">
+    Wrap complex migrations in transactions to ensure atomicity:
+    ```typescript
+    async up() {
+      this.schema.createTable('posts', (table) => {
+        // table definition
+      })
+      
+      this.defer(async (db) => {
+        await db.transaction(async (trx) => {
+          // Complex operations
+        })
+      })
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Keep seeders idempotent">
+    Use `updateOrCreateMany` or check for existence before creating records to prevent duplicates when running seeders multiple times.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Models" icon="cubes" href="/development/models">
+    Learn how to create and use Lucid ORM models
+  </Card>
+  
+  <Card title="Routes" icon="route" href="/development/routes">
+    Define routes to handle HTTP requests
+  </Card>
+</CardGroup>

@@ -1,0 +1,685 @@
+---
+title: Production Deployment
+description: Deploy the AdonisJS Starter Kit to production environments
+---
+
+This guide covers deploying the AdonisJS Starter Kit to production servers using Docker and other deployment strategies.
+
+## Pre-Deployment Checklist
+
+<Steps>
+  <Step title="Environment Configuration">
+    Ensure all production environment variables are set correctly.
+    
+    <Check>
+      - `NODE_ENV=production`
+      - `APP_KEY` is set (use `node ace generate:key`)
+      - Database credentials configured
+      - Email service configured (Resend or SMTP)
+      - OAuth credentials for Google login
+    </Check>
+  </Step>
+
+  <Step title="Database Setup">
+    Prepare your production database.
+    
+    ```bash
+    # Run migrations
+    node ace migration:run --force
+    
+    # Run seeders (if needed)
+    node ace db:seed
+    ```
+  </Step>
+
+  <Step title="Build Application">
+    Build the production bundle.
+    
+    ```bash
+    # Build application
+    node ace build
+    
+    # Test the build
+    cd build
+    node bin/server.js
+    ```
+  </Step>
+
+  <Step title="Security Review">
+    Review security settings.
+    
+    <Check>
+      - CORS settings configured
+      - Rate limiting enabled
+      - CSRF protection enabled
+      - Secure cookies enabled (HTTPS)
+      - Database connections use SSL
+    </Check>
+  </Step>
+</Steps>
+
+## Docker Production Deployment
+
+### Building the Production Image
+
+The production Dockerfile is optimized for size and security:
+
+```dockerfile
+FROM node:22-alpine
+
+# Install compatibility libraries
+RUN apk add --no-cache libc6-compat
+
+WORKDIR /app
+
+# Enable pnpm
+RUN npm install -g corepack@latest
+RUN corepack enable pnpm
+
+COPY . .
+
+# Install dependencies
+ENV CI=true
+RUN pnpm install --force --frozen-lockfile
+
+# Build application
+WORKDIR /app/apps/web
+RUN node ace build --ignore-ts-errors
+
+WORKDIR /app/apps/web/build
+
+EXPOSE 3333
+
+CMD ["node", "bin/server.js"]
+```
+
+**Key Features:**
+- Alpine Linux base (minimal size)
+- Multi-stage build considerations
+- Frozen lockfile for reproducibility
+- Production build optimization
+
+### Deploy with Docker Compose
+
+<CodeGroup>
+```bash Deploy Stack
+# Build and start all services
+docker compose -f docker-compose.prod.yaml up -d --build
+
+# Check service status
+docker compose -f docker-compose.prod.yaml ps
+
+# View logs
+docker compose -f docker-compose.prod.yaml logs -f web
+```
+
+```bash Update Deployment
+# Pull latest code
+git pull origin main
+
+# Rebuild and restart
+docker compose -f docker-compose.prod.yaml up -d --build web
+
+# Restart all services
+docker compose -f docker-compose.prod.yaml restart
+```
+
+```bash Database Migrations
+# Run migrations in production
+docker compose -f docker-compose.prod.yaml exec web node ace migration:run --force
+
+# Check migration status
+docker compose -f docker-compose.prod.yaml exec web node ace migration:status
+```
+</CodeGroup>
+
+### Production Stack Architecture
+
+The production setup includes:
+
+<Steps>
+  <Step title="Nginx Reverse Proxy">
+    Handles incoming HTTP/HTTPS traffic on ports 80/443.
+    
+    ```nginx
+    server {
+      listen 80;
+      server_name example.com;
+      client_max_body_size 100M;
+      
+      location / {
+        proxy_pass http://web:3333;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="AdonisJS Application">
+    The web service runs the Node.js application on port 3333.
+    
+    ```yaml
+    web:
+      restart: always
+      environment:
+        HOST: web
+        NODE_ENV: production
+        DB_HOST: pgsql
+    ```
+  </Step>
+
+  <Step title="PostgreSQL Database">
+    Internal database with no exposed ports.
+    
+    ```yaml
+    pgsql:
+      restart: always
+      ports: []  # No external access
+    ```
+  </Step>
+</Steps>
+
+## Traditional Server Deployment
+
+### Server Requirements
+
+<CardGroup cols={2}>
+  <Card title="Minimum Specs" icon="server">
+    - 1 CPU core
+    - 1GB RAM
+    - 10GB storage
+    - Ubuntu 22.04 or later
+  </Card>
+  <Card title="Recommended Specs" icon="server">
+    - 2+ CPU cores
+    - 2GB+ RAM
+    - 20GB+ storage
+    - Load balancer ready
+  </Card>
+</CardGroup>
+
+### Manual Deployment Steps
+
+<Steps>
+  <Step title="Install Dependencies">
+    ```bash
+    # Update system
+    sudo apt update && sudo apt upgrade -y
+    
+    # Install Node.js 22
+    curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+    sudo apt install -y nodejs
+    
+    # Install pnpm
+    corepack enable pnpm
+    
+    # Install PostgreSQL
+    sudo apt install -y postgresql postgresql-contrib
+    ```
+  </Step>
+
+  <Step title="Setup Application">
+    ```bash
+    # Clone repository
+    git clone <your-repo-url> /var/www/app
+    cd /var/www/app
+    
+    # Install dependencies
+    pnpm install --prod
+    
+    # Build application
+    cd apps/web
+    node ace build
+    ```
+  </Step>
+
+  <Step title="Configure Environment">
+    ```bash
+    # Copy environment file
+    cp apps/web/.env.example apps/web/.env
+    
+    # Edit with production values
+    nano apps/web/.env
+    ```
+    
+    <Warning>
+      Never commit `.env` files to version control. Use secret management tools.
+    </Warning>
+  </Step>
+
+  <Step title="Setup Process Manager">
+    Use PM2 to manage the Node.js process:
+    
+    ```bash
+    # Install PM2
+    npm install -g pm2
+    
+    # Start application
+    cd /var/www/app/apps/web/build
+    pm2 start bin/server.js --name "adonisjs-app"
+    
+    # Save PM2 configuration
+    pm2 save
+    
+    # Setup startup script
+    pm2 startup
+    ```
+  </Step>
+
+  <Step title="Configure Nginx">
+    ```nginx
+    server {
+      listen 80;
+      server_name example.com;
+      
+      location / {
+        proxy_pass http://localhost:3333;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_cache_bypass $http_upgrade;
+      }
+    }
+    ```
+    
+    ```bash
+    # Enable site
+    sudo ln -s /etc/nginx/sites-available/app /etc/nginx/sites-enabled/
+    sudo nginx -t
+    sudo systemctl restart nginx
+    ```
+  </Step>
+</Steps>
+
+### SSL/TLS Setup with Let's Encrypt
+
+```bash
+# Install Certbot
+sudo apt install -y certbot python3-certbot-nginx
+
+# Obtain certificate
+sudo certbot --nginx -d example.com -d www.example.com
+
+# Auto-renewal is configured automatically
+sudo certbot renew --dry-run
+```
+
+## Platform-as-a-Service Deployments
+
+### Deploying to Railway
+
+<Steps>
+  <Step title="Connect Repository">
+    1. Create a new project on [Railway](https://railway.app)
+    2. Connect your GitHub repository
+    3. Select the `apps/web` directory as root
+  </Step>
+
+  <Step title="Configure Services">
+    Add services:
+    - PostgreSQL database (from Railway marketplace)
+    - Redis (optional, for caching)
+  </Step>
+
+  <Step title="Set Environment Variables">
+    Configure in Railway dashboard:
+    ```env
+    NODE_ENV=production
+    APP_KEY=${{ railway.secret }}
+    DB_HOST=${{ Postgres.PGHOST }}
+    DB_PORT=${{ Postgres.PGPORT }}
+    DB_USER=${{ Postgres.PGUSER }}
+    DB_PASSWORD=${{ Postgres.PGPASSWORD }}
+    DB_DATABASE=${{ Postgres.PGDATABASE }}
+    ```
+  </Step>
+
+  <Step title="Deploy">
+    Railway automatically deploys on git push.
+    
+    ```bash
+    git push origin main
+    ```
+  </Step>
+</Steps>
+
+### Deploying to Render
+
+<Steps>
+  <Step title="Create Web Service">
+    1. Go to [Render Dashboard](https://dashboard.render.com)
+    2. New → Web Service
+    3. Connect repository
+  </Step>
+
+  <Step title="Configure Build">
+    ```yaml
+    # Build Command
+    cd apps/web && pnpm install && node ace build
+    
+    # Start Command
+    cd apps/web/build && node bin/server.js
+    
+    # Root Directory
+    ./
+    ```
+  </Step>
+
+  <Step title="Add PostgreSQL">
+    1. Create PostgreSQL database from Render dashboard
+    2. Copy connection details
+    3. Add to environment variables
+  </Step>
+
+  <Step title="Deploy">
+    Render auto-deploys on push to main branch.
+  </Step>
+</Steps>
+
+### Deploying to Fly.io
+
+<Steps>
+  <Step title="Install Fly CLI">
+    ```bash
+    curl -L https://fly.io/install.sh | sh
+    fly auth login
+    ```
+  </Step>
+
+  <Step title="Initialize App">
+    ```bash
+    cd apps/web
+    fly launch
+    ```
+  </Step>
+
+  <Step title="Create Database">
+    ```bash
+    fly postgres create
+    fly postgres attach <db-name>
+    ```
+  </Step>
+
+  <Step title="Deploy">
+    ```bash
+    fly deploy
+    ```
+  </Step>
+</Steps>
+
+## Database Management
+
+### Migrations
+
+<CodeGroup>
+```bash Run Migrations
+# Production migrations
+node ace migration:run --force
+
+# Check status
+node ace migration:status
+
+# Rollback (careful!)
+node ace migration:rollback --force
+```
+
+```bash Docker Environment
+# Run migrations in container
+docker compose exec web node ace migration:run --force
+```
+</CodeGroup>
+
+### Backup Strategy
+
+<Tabs>
+  <Tab title="Manual Backup">
+    ```bash
+    # Backup database
+    pg_dump -h localhost -U root -d app > backup-$(date +%Y%m%d).sql
+    
+    # Restore database
+    psql -h localhost -U root -d app < backup-20260303.sql
+    ```
+  </Tab>
+  <Tab title="Docker Backup">
+    ```bash
+    # Backup from container
+    docker compose exec pgsql pg_dump -U root app > backup.sql
+    
+    # Restore to container
+    cat backup.sql | docker compose exec -T pgsql psql -U root app
+    ```
+  </Tab>
+  <Tab title="Automated Backup">
+    ```bash
+    # Create backup script
+    cat > /usr/local/bin/db-backup.sh << 'EOF'
+    #!/bin/bash
+    BACKUP_DIR="/backups"
+    DATE=$(date +%Y%m%d-%H%M%S)
+    pg_dump -U root app | gzip > "$BACKUP_DIR/backup-$DATE.sql.gz"
+    # Keep only last 7 days
+    find $BACKUP_DIR -name "*.sql.gz" -mtime +7 -delete
+    EOF
+    
+    # Make executable
+    chmod +x /usr/local/bin/db-backup.sh
+    
+    # Add to crontab (daily at 2 AM)
+    echo "0 2 * * * /usr/local/bin/db-backup.sh" | crontab -
+    ```
+  </Tab>
+</Tabs>
+
+## Monitoring and Logging
+
+### Application Logs
+
+<CodeGroup>
+```bash Docker Logs
+# Follow logs
+docker compose logs -f web
+
+# Last 100 lines
+docker compose logs --tail=100 web
+
+# Export logs
+docker compose logs web > app.log
+```
+
+```bash PM2 Logs
+# View logs
+pm2 logs adonisjs-app
+
+# Error logs only
+pm2 logs adonisjs-app --err
+
+# Clear logs
+pm2 flush
+```
+</CodeGroup>
+
+### Health Checks
+
+Implement health check endpoint:
+
+```typescript
+// routes/health.ts
+import router from '@adonisjs/core/services/router'
+
+router.get('/health', async ({ response }) => {
+  return response.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  })
+})
+```
+
+Configure in Docker:
+
+```yaml
+web:
+  healthcheck:
+    test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3333/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+```
+
+### Performance Monitoring
+
+Consider integrating:
+
+<CardGroup cols={2}>
+  <Card title="Application Monitoring" icon="chart-line">
+    - [New Relic](https://newrelic.com)
+    - [Datadog](https://datadoghq.com)
+    - [Sentry](https://sentry.io) for error tracking
+  </Card>
+  <Card title="Infrastructure Monitoring" icon="server">
+    - [Prometheus](https://prometheus.io)
+    - [Grafana](https://grafana.com)
+    - [Uptime Robot](https://uptimerobot.com)
+  </Card>
+</CardGroup>
+
+## Scaling Considerations
+
+### Horizontal Scaling
+
+<Steps>
+  <Step title="Stateless Application">
+    Ensure your application is stateless:
+    - Use database for sessions (not memory)
+    - Store uploads in S3/cloud storage
+    - Use Redis for cache and queues
+  </Step>
+
+  <Step title="Load Balancer">
+    Configure load balancer (Nginx, HAProxy, or cloud LB):
+    ```nginx
+    upstream backend {
+      least_conn;
+      server web1:3333;
+      server web2:3333;
+      server web3:3333;
+    }
+    ```
+  </Step>
+
+  <Step title="Database Connection Pooling">
+    Configure in `config/database.ts`:
+    ```typescript
+    postgres: {
+      pool: {
+        min: 2,
+        max: 10,
+      },
+    }
+    ```
+  </Step>
+</Steps>
+
+### Vertical Scaling
+
+Adjust resource limits:
+
+```yaml
+web:
+  deploy:
+    resources:
+      limits:
+        cpus: '2.0'
+        memory: 2G
+      reservations:
+        cpus: '1.0'
+        memory: 1G
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Application won't start">
+    1. Check environment variables:
+       ```bash
+       docker compose exec web env | grep NODE_ENV
+       ```
+    2. Verify build completed:
+       ```bash
+       ls -la apps/web/build
+       ```
+    3. Check for missing dependencies:
+       ```bash
+       docker compose exec web pnpm install
+       ```
+  </Accordion>
+
+  <Accordion title="Database connection errors">
+    1. Verify database is running:
+       ```bash
+       docker compose ps pgsql
+       ```
+    2. Test connection:
+       ```bash
+       docker compose exec web node ace db:check
+       ```
+    3. Check credentials in `.env`
+  </Accordion>
+
+  <Accordion title="High memory usage">
+    1. Check Node.js memory limit:
+       ```bash
+       NODE_OPTIONS="--max-old-space-size=2048"
+       ```
+    2. Review database query performance
+    3. Implement caching strategy
+  </Accordion>
+
+  <Accordion title="Slow response times">
+    1. Enable query logging:
+       ```typescript
+       postgres: {
+         debug: true,
+       }
+       ```
+    2. Add database indexes
+    3. Implement Redis caching
+    4. Use CDN for static assets
+  </Accordion>
+</AccordionGroup>
+
+## Security Checklist
+
+<Check>
+  - [ ] `APP_KEY` is unique and secret
+  - [ ] Database uses strong password
+  - [ ] HTTPS/SSL enabled
+  - [ ] CORS configured for production domains
+  - [ ] Rate limiting enabled
+  - [ ] CSRF protection active
+  - [ ] Security headers configured
+  - [ ] Secrets stored in environment variables (not code)
+  - [ ] Regular security updates applied
+  - [ ] Database backups automated
+  - [ ] Monitoring and alerts configured
+</Check>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Docker Setup" icon="docker" href="/deployment/docker">
+    Learn about Docker configuration
+  </Card>
+  <Card title="Environment Variables" icon="key" href="/deployment/environment">
+    Configure environment variables
+  </Card>
+</CardGroup>

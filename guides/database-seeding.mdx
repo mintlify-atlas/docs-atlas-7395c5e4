@@ -1,0 +1,433 @@
+---
+title: Database Seeding
+description: Learn how to seed your database with initial data using AdonisJS seeders
+---
+
+Database seeders allow you to populate your database with initial or test data. The AdonisJS Starter Kit uses seeders to create default users, roles, and other essential data.
+
+## Overview
+
+Seeders are useful for:
+- Creating default admin users
+- Populating lookup tables (roles, categories, etc.)
+- Generating test data for development
+- Setting up demo accounts
+
+## Running Seeders
+
+<Steps>
+  <Step title="Run all seeders">
+    Execute all seeders in your application:
+
+    ```bash
+    pnpm --filter web exec node ace db:seed
+    ```
+
+    This runs all seeder files in the `database/seeders/` directories.
+  </Step>
+
+  <Step title="Run a specific seeder">
+    To run a single seeder file:
+
+    ```bash
+    node ace db:seed --files=./app/users/database/seeders/user_seeder.ts
+    ```
+  </Step>
+
+  <Step title="Verify the data">
+    Check your database to confirm the data was seeded correctly:
+
+    ```bash
+    # Using PgAdmin (included in Docker Compose)
+    # Navigate to http://localhost:5050
+
+    # Or using psql
+    docker exec -it postgres psql -U root -d app
+    ```
+  </Step>
+</Steps>
+
+## Default User Seeder
+
+The starter kit includes a user seeder that creates a default admin account:
+
+```typescript app/users/database/seeders/user_seeder.ts
+import { BaseSeeder } from '@adonisjs/lucid/seeders'
+import User from '#users/models/user'
+import Roles from '#users/enums/role'
+
+export default class UserSeeder extends BaseSeeder {
+  async run() {
+    const uniqueKey = 'email'
+
+    await User.updateOrCreateMany(uniqueKey, [
+      {
+        email: 'admin@repo.com',
+        fullName: 'Administrador',
+        password: '123',
+        roleId: Roles.ADMIN,
+      },
+    ])
+  }
+}
+```
+
+<Info>
+  **Default credentials:**
+  - Email: `admin@repo.com`
+  - Password: `123`
+  
+  Change these in production!
+</Info>
+
+## Creating a Seeder
+
+<Steps>
+  <Step title="Generate a seeder">
+    Create a new seeder using the Ace command:
+
+    ```bash
+    node ace make:seeder category
+    ```
+
+    For module-specific seeders:
+
+    ```bash
+    node ace make:seeder product -m=products
+    ```
+
+    This creates a seeder file in `app/products/database/seeders/product_seeder.ts`.
+  </Step>
+
+  <Step title="Define the seeder logic">
+    ```typescript app/products/database/seeders/product_seeder.ts
+    import { BaseSeeder } from '@adonisjs/lucid/seeders'
+    import Product from '#products/models/product'
+
+    export default class ProductSeeder extends BaseSeeder {
+      async run() {
+        await Product.updateOrCreateMany('slug', [
+          {
+            slug: 'laptop',
+            name: 'Gaming Laptop',
+            description: 'High-performance laptop for gaming',
+            price: 1299.99,
+            stock: 10,
+          },
+          {
+            slug: 'keyboard',
+            name: 'Mechanical Keyboard',
+            description: 'RGB mechanical keyboard',
+            price: 149.99,
+            stock: 50,
+          },
+        ])
+      }
+    }
+    ```
+
+    <Tip>
+      Use `updateOrCreateMany()` to avoid duplicate entries when running seeders multiple times.
+    </Tip>
+  </Step>
+
+  <Step title="Run the seeder">
+    ```bash
+    node ace db:seed
+    ```
+  </Step>
+</Steps>
+
+## Seeder Best Practices
+
+### Use updateOrCreateMany for Idempotency
+
+Always use `updateOrCreateMany()` instead of `createMany()` to make seeders idempotent:
+
+```typescript
+// Good - can be run multiple times safely
+await User.updateOrCreateMany('email', [
+  { email: 'admin@repo.com', fullName: 'Admin', password: '123' },
+])
+
+// Bad - creates duplicates on each run
+await User.createMany([
+  { email: 'admin@repo.com', fullName: 'Admin', password: '123' },
+])
+```
+
+### Use Factories for Test Data
+
+For generating large amounts of test data, use model factories instead:
+
+```typescript
+import { BaseSeeder } from '@adonisjs/lucid/seeders'
+import User from '#users/models/user'
+
+export default class UserSeeder extends BaseSeeder {
+  async run() {
+    // Create 100 random users
+    await User.factory().createMany(100)
+  }
+}
+```
+
+### Organize Seeders by Module
+
+Place seeders in their respective module directories:
+
+```
+app/
+├── users/
+│   └── database/
+│       └── seeders/
+│           └── user_seeder.ts
+├── products/
+│   └── database/
+│       └── seeders/
+│           └── product_seeder.ts
+└── categories/
+    └── database/
+        └── seeders/
+            └── category_seeder.ts
+```
+
+## Common Seeding Patterns
+
+### Seeding Related Data
+
+```typescript
+import { BaseSeeder } from '@adonisjs/lucid/seeders'
+import Category from '#products/models/category'
+import Product from '#products/models/product'
+
+export default class ProductSeeder extends BaseSeeder {
+  async run() {
+    // Create categories first
+    const electronics = await Category.updateOrCreate(
+      { slug: 'electronics' },
+      { name: 'Electronics', slug: 'electronics' }
+    )
+
+    // Then create products with category relationship
+    await Product.updateOrCreateMany('slug', [
+      {
+        slug: 'laptop',
+        name: 'Gaming Laptop',
+        categoryId: electronics.id,
+        price: 1299.99,
+      },
+    ])
+  }
+}
+```
+
+### Seeding with Relationships
+
+```typescript
+import { BaseSeeder } from '@adonisjs/lucid/seeders'
+import User from '#users/models/user'
+import Post from '#blog/models/post'
+
+export default class BlogSeeder extends BaseSeeder {
+  async run() {
+    const user = await User.firstOrCreate(
+      { email: 'author@example.com' },
+      {
+        fullName: 'Blog Author',
+        email: 'author@example.com',
+        password: 'secret',
+      }
+    )
+
+    await user.related('posts').updateOrCreateMany(
+      [
+        {
+          title: 'First Post',
+          slug: 'first-post',
+          content: 'This is my first blog post',
+        },
+        {
+          title: 'Second Post',
+          slug: 'second-post',
+          content: 'This is my second blog post',
+        },
+      ],
+      'slug'
+    )
+  }
+}
+```
+
+### Conditional Seeding
+
+Only seed data in certain environments:
+
+```typescript
+import { BaseSeeder } from '@adonisjs/lucid/seeders'
+import User from '#users/models/user'
+import env from '#start/env'
+
+export default class UserSeeder extends BaseSeeder {
+  async run() {
+    // Only create test users in development
+    if (env.get('NODE_ENV') === 'development') {
+      await User.updateOrCreateMany('email', [
+        { email: 'test1@example.com', fullName: 'Test User 1', password: '123' },
+        { email: 'test2@example.com', fullName: 'Test User 2', password: '123' },
+      ])
+    }
+
+    // Always create admin user
+    await User.updateOrCreateMany('email', [
+      { email: 'admin@repo.com', fullName: 'Admin', password: '123' },
+    ])
+  }
+}
+```
+
+## Seeding Order
+
+Seeders run in alphabetical order by filename. To control execution order, prefix filenames with numbers:
+
+```
+database/seeders/
+├── 01_role_seeder.ts       # Runs first
+├── 02_user_seeder.ts       # Runs second
+└── 03_product_seeder.ts    # Runs third
+```
+
+Or use the `MainSeeder` pattern:
+
+```typescript database/seeders/main_seeder.ts
+import { BaseSeeder } from '@adonisjs/lucid/seeders'
+import app from '@adonisjs/core/services/app'
+
+export default class MainSeeder extends BaseSeeder {
+  async run() {
+    // Run seeders in specific order
+    await this.call([
+      app.makePath('database/seeders/role_seeder'),
+      app.makePath('database/seeders/user_seeder'),
+      app.makePath('database/seeders/product_seeder'),
+    ])
+  }
+}
+```
+
+## Environment-Specific Seeders
+
+Create different seeders for different environments:
+
+```typescript
+import { BaseSeeder } from '@adonisjs/lucid/seeders'
+
+export default class extends BaseSeeder {
+  // Only run in development
+  static environment = ['development', 'testing']
+
+  async run() {
+    // Development-only seed data
+  }
+}
+```
+
+## Resetting and Reseeding
+
+<Steps>
+  <Step title="Fresh database with seeds">
+    Drop all tables, run migrations, and seed:
+
+    ```bash
+    node ace migration:fresh --seed
+    ```
+
+    <Warning>
+      This will **delete all data** in your database!
+    </Warning>
+  </Step>
+
+  <Step title="Rollback and reseed">
+    ```bash
+    node ace migration:rollback
+    node ace migration:run
+    node ace db:seed
+    ```
+  </Step>
+</Steps>
+
+## Tips and Tricks
+
+<Card title="Use consistent passwords in development" icon="key">
+  Keep passwords simple in development seeders (like `'123'`) for easy testing.
+</Card>
+
+<Card title="Seed real-looking data" icon="user-group">
+  Use libraries like `@faker-js/faker` to generate realistic test data.
+</Card>
+
+<Card title="Document default credentials" icon="file-text">
+  Always document seeded user credentials in your README or .env.example.
+</Card>
+
+<Card title="Never seed production data in development" icon="alert-triangle">
+  Keep production and development data separate. Never use real user data in seeders.
+</Card>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Seeder not running">
+    Ensure:
+    - The seeder file is in a `database/seeders/` directory
+    - The seeder extends `BaseSeeder`
+    - The file exports a default class
+    - The class has a `run()` method
+  </Accordion>
+
+  <Accordion title="Duplicate key errors">
+    Use `updateOrCreateMany()` instead of `createMany()` to handle existing records:
+    
+    ```typescript
+    await User.updateOrCreateMany('email', [...])
+    ```
+  </Accordion>
+
+  <Accordion title="Foreign key constraint errors">
+    Seed parent tables before child tables:
+    1. First seed roles
+    2. Then seed users (which reference roles)
+    3. Finally seed user-dependent data
+  </Accordion>
+
+  <Accordion title="Seeder running in production">
+    Use the `environment` property to restrict seeders:
+    
+    ```typescript
+    export default class extends BaseSeeder {
+      static environment = ['development']
+      // ...
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Resources
+
+<CardGroup cols={2}>
+  <Card title="Seeders Documentation" icon="book" href="https://docs.adonisjs.com/guides/database/seeders">
+    Official AdonisJS seeders guide
+  </Card>
+  
+  <Card title="Model Factories" icon="industry" href="https://docs.adonisjs.com/guides/database/factories">
+    Generate fake data efficiently
+  </Card>
+  
+  <Card title="Migrations" icon="database" href="https://docs.adonisjs.com/guides/database/migrations">
+    Learn about database migrations
+  </Card>
+  
+  <Card title="Lucid ORM" icon="gear" href="https://docs.adonisjs.com/guides/database/introduction">
+    Database and ORM documentation
+  </Card>
+</CardGroup>

@@ -1,0 +1,304 @@
+---
+title: Authentication
+description: Secure email/password authentication with session management and rate limiting
+icon: lock
+---
+
+## Overview
+
+The AdonisJS Starter Kit provides a complete authentication system with email/password login, registration, password recovery, and secure session management. Authentication is built on AdonisJS's native auth system with rate limiting and CSRF protection.
+
+## Authentication Flow
+
+The starter kit uses **session-based authentication** for web applications with an additional **token-based authentication** option for API access.
+
+### Sign Up Process
+
+Users can register with their full name, email, and password:
+
+<CodeGroup>
+```typescript app/auth/controllers/sign_up_controller.ts
+import { HttpContext } from '@adonisjs/core/http'
+import { afterAuthRedirectRoute } from '#config/auth'
+import User from '#users/models/user'
+import { signUpValidator } from '#auth/validators'
+
+export default class SignUpController {
+  async show({ inertia }: HttpContext) {
+    return inertia.render('auth/sign_up')
+  }
+
+  async handle({ auth, request, response }: HttpContext) {
+    const { email, password, fullName } = await request.validateUsing(signUpValidator)
+
+    const user = await User.create({ fullName, email, password })
+
+    await auth.use('web').login(user)
+
+    return response.redirect().toRoute(afterAuthRedirectRoute)
+  }
+}
+```
+
+```typescript app/auth/validators.ts
+import vine from '@vinejs/vine'
+
+export const signUpValidator = vine.compile(
+  vine.object({
+    fullName: vine.string().trim().minLength(3).maxLength(255),
+    email: vine.string().email().toLowerCase().trim().unique({ 
+      table: 'users', 
+      column: 'email' 
+    }),
+    password: vine.string().minLength(1).confirmed({ 
+      confirmationField: 'passwordConfirmation' 
+    }),
+  })
+)
+```
+</CodeGroup>
+
+### Sign In with Rate Limiting
+
+The sign-in process includes built-in rate limiting to prevent brute force attacks:
+
+```typescript app/auth/controllers/sign_in_controller.ts
+import { HttpContext } from '@adonisjs/core/http'
+import limiter from '@adonisjs/limiter/services/main'
+import User from '#users/models/user'
+
+export default class SignInController {
+  private loginLimiter: Limiter
+
+  constructor() {
+    this.loginLimiter = limiter.use({
+      requests: 5,
+      duration: '1 min',
+      blockDuration: '1 min',
+    })
+  }
+
+  async handle({ auth, request, response, session, i18n }: HttpContext) {
+    const { email, password } = await request.validateUsing(signInValidator)
+    const returnTo = session.pull(returnToKey, null)
+
+    session.regenerate()
+
+    const key = `login_${request.ip()}_${email}`
+
+    const [errors, user] = await this.loginLimiter.penalize(key, () => {
+      return User.verifyCredentials(email, password)
+    })
+    
+    if (errors) {
+      session.flashErrors({
+        E_TOO_MANY_REQUESTS: i18n.t('errors.E_TOO_MANY_REQUESTS'),
+      })
+      return response.redirect().toRoute('auth.sign_in.show')
+    }
+    
+    await auth.use('web').login(user)
+    return response.redirect().toRoute(afterAuthRedirectRoute)
+  }
+}
+```
+
+<Info>
+**Rate Limiting Protection**: Login attempts are limited to 5 requests per minute per IP and email combination. After exceeding the limit, users are blocked for 1 minute.
+</Info>
+
+## User Model
+
+The User model uses AdonisJS's `withAuthFinder` mixin for authentication:
+
+```typescript app/users/models/user.ts
+import hash from '@adonisjs/core/services/hash'
+import { compose } from '@adonisjs/core/helpers'
+import { belongsTo, column } from '@adonisjs/lucid/orm'
+import { withAuthFinder } from '@adonisjs/auth/mixins/lucid'
+import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
+import BaseModel from '#common/models/base_model'
+import Role from '#users/models/role'
+
+const AuthFinder = withAuthFinder(() => hash.use('scrypt'), {
+  uids: ['email'],
+  passwordColumnName: 'password',
+})
+
+export default class User extends compose(BaseModel, AuthFinder) {
+  @column({ isPrimary: true })
+  declare id: number
+
+  @column()
+  declare roleId: number
+
+  @column()
+  declare fullName: string | null
+
+  @column()
+  declare email: string
+
+  @column({ serializeAs: null })
+  declare password: string | null
+
+  @belongsTo(() => Role)
+  declare role: BelongsTo<typeof Role>
+
+  static accessTokens = DbAccessTokensProvider.forModel(User)
+}
+```
+
+## Authentication Middleware
+
+Protect routes with the auth middleware:
+
+```typescript app/auth/middleware/auth_middleware.ts
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+
+export const returnToKey = 'return_to'
+
+export default class AuthMiddleware {
+  protected redirectTo = '/login'
+
+  async handle(
+    ctx: HttpContext,
+    next: NextFn,
+    options: { guards?: (keyof Authenticators)[] } = {}
+  ) {
+    try {
+      await ctx.auth.authenticateUsing(options.guards, {
+        loginRoute: this.redirectTo,
+      })
+    } catch (err) {
+      if (err instanceof errors.E_UNAUTHORIZED_ACCESS) {
+        ctx.session.put(returnToKey, ctx.request.url(true))
+      }
+      throw err
+    }
+
+    return next()
+  }
+}
+```
+
+<Note>
+The middleware saves the original URL in the session, so users are redirected back after successful login.
+</Note>
+
+## Authentication Routes
+
+All authentication routes are defined in `app/auth/routes.ts`:
+
+```typescript app/auth/routes.ts
+import router from '@adonisjs/core/services/router'
+import { middleware } from '#start/kernel'
+
+// Sign In
+router.get('/login', [SignInController, 'show'])
+  .use(middleware.guest())
+  .as('auth.sign_in.show')
+router.post('/login', [SignInController])
+
+// Sign Out
+router.get('/logout', [SignOutController]).as('auth.sign_out.show')
+
+// Sign Up
+router.get('/sign-up', [SignUpController, 'show'])
+  .use(middleware.guest())
+  .as('auth.sign_up.show')
+router.post('/sign-up', [SignUpController])
+  .use(middleware.guest())
+  .as('auth.sign_up.handle')
+
+// Password Recovery
+router.get('/forgot-password', [ForgotPasswordController, 'show'])
+  .as('auth.forgot_password.show')
+  .use(middleware.guest())
+router.post('/forgot-password', [ForgotPasswordController])
+  .as('auth.forgot_password.handle')
+
+router.get('/reset-password/:token', [ResetPasswordController, 'show'])
+  .use(middleware.guest())
+  .as('auth.reset_password.show')
+router.post('/reset-password/:token', [ResetPasswordController])
+  .use(middleware.guest())
+  .as('auth.reset_password.handle')
+```
+
+## Configuration
+
+Authentication configuration in `config/auth.ts`:
+
+```typescript config/auth.ts
+import { defineConfig } from '@adonisjs/auth'
+import { sessionGuard, sessionUserProvider } from '@adonisjs/auth/session'
+import { tokensGuard, tokensUserProvider } from '@adonisjs/auth/access_tokens'
+
+export const afterAuthRedirectRoute = 'dashboard.show'
+export const afterAuthLogoutRedirectRoute = 'marketing.show'
+
+const authConfig = defineConfig({
+  default: 'web',
+  guards: {
+    web: sessionGuard({
+      useRememberMeTokens: false,
+      provider: sessionUserProvider({
+        model: () => import('#users/models/user'),
+      }),
+    }),
+    api: tokensGuard({
+      provider: tokensUserProvider({
+        tokens: 'accessTokens',
+        model: () => import('#users/models/user'),
+      }),
+    }),
+  },
+})
+
+export default authConfig
+```
+
+## Password Security
+
+- Passwords are hashed using **scrypt** algorithm
+- Password confirmation required on registration
+- Minimum password length enforced
+- Password reset tokens expire after a set period
+
+<CardGroup cols={2}>
+  <Card title="Password Recovery" icon="key" href="/features/authentication#password-recovery">
+    Learn about the password reset flow
+  </Card>
+  <Card title="Social Auth" icon="share-nodes" href="/features/social-auth">
+    Add Google and GitHub authentication
+  </Card>
+</CardGroup>
+
+## Usage in Controllers
+
+Access the authenticated user in your controllers:
+
+```typescript
+export default class DashboardController {
+  async show({ auth, inertia }: HttpContext) {
+    const user = auth.user! // Current authenticated user
+    
+    return inertia.render('dashboard', {
+      userName: user.fullName,
+      email: user.email,
+    })
+  }
+}
+```
+
+## Session Management
+
+- Sessions are regenerated on login for security
+- Session data stored server-side
+- CSRF protection enabled by default
+- Secure cookies in production
+
+<Check>
+**Production Ready**: The authentication system follows security best practices including CSRF protection, secure session handling, and password hashing.
+</Check>
